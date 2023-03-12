@@ -113,6 +113,24 @@ st_write(sitmap_2rad.filter.ow, paste0(path.wd.prep, "overview-selected-2rad.shp
 saveRDS(lsd.filter, paste0(path.wd.prep, "overview-lsd.filter.rds"))
 
 
+# Zuur, A.F., Ieno, E.N. and Elphick, C.S., 2010. A protocol for data exploration to avoid common statistical problems. Methods in ecology and evolution, 1(1), pp.3-14.
+# - but a more stringent approach is to use values as low as 3 as we did here. High, or even moderate, collinearity is especially problematic when ecological signals are weak. In that case, even a VIF of 2 may cause nonsignificant parameter estimates, compared to the situation without collinearity.
+
+
+lsd.filter.oneTaxonOccPerPOLE <- lsd.filter %>%
+  group_by(POLE, TaxonNameLAT) %>%
+  slice_head(n = 1)
+# aspoň X návštěv na pole...
+spCounts <- lsd.filter.oneTaxonOccPerPOLE %>%
+  group_by(TaxonNameLAT) %>%
+  summarise(spCount = n_distinct(ObsListsID)) %>%
+  arrange(desc(spCount)) %>%
+  filter(spCount >= 10)
+
+
+
+
+
 stop()
 # TODO: cross check - odpovídají názvy kvadrátů ze SiteName reálně poloze (Lat, Lon)? - udělat i prostorový průnik se sítí
 lsd.filter %>% left_join(sitmap_2rad.source, by = "POLE")
