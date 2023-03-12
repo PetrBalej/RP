@@ -538,3 +538,23 @@ dev.off()
 rr <- writeRaster(raster_stack, paste0(path.igaD, "clean/predictors/observerSkill/preds_final.grd"), format = "raster", overwrite = TRUE)
 hdr(rr, format = "ENVI")
 saveRDS(raster_stack, paste0(path.igaD, "clean/predictors/observerSkill/preds_final.rds"))
+
+
+# předchozí kód je mimo RP, z rgee, nutno uzpůsobit
+
+# PCA/vif
+library(RStoolbox)
+library(raster)
+raster_stack <- readRDS(paste0(path.wd, "dataPrep/observerSkill/preds_final.rds"))
+# PCA všech 23
+pcamap <- rasterPCA(raster_stack, spca = TRUE)
+summary(pcamap$model)
+saveRDS(pcamap, paste0(path.wd, "dataPrep/observerSkill/pcamap.rds"))
+
+
+# prvních 6 os vysvětluje > 90% total variance, uložit
+rs <- stack(pcamap$map[[1:6]])
+saveRDS(rs, paste0(path.wd, "dataPrep/observerSkill/pcamap6.rds"))
+rr <- writeRaster(rs, paste0(path.wd, "dataPrep/observerSkill/pcamap6.rds"), format = "raster", overwrite = TRUE)
+hdr(rr, format = "ENVI")
+
