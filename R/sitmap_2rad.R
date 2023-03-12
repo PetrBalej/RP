@@ -13,10 +13,10 @@ lapply(required_packages, require, character.only = TRUE)
 ############
 
 # nastavit working directory
-path.wd <- "C:/Users/petr/Downloads/RP/RP/"
+path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/"
 setwd(path.wd)
-path.data <- "C:/Users/petr/Downloads/RP/projects-data/"
-path.rgee <- "C:/Users/petr/Documents/pc02/rgee20230227/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
+path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/"
+path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
 # source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/sitmap_2rad/")
 
