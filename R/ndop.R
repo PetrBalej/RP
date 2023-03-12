@@ -1,7 +1,7 @@
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
-required_packages <- c("tidyverse", "sf", "magrittr", "stringi") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
+required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "lubridate") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
 
 install.packages(setdiff(required_packages, rownames(installed.packages())))
 
@@ -13,10 +13,10 @@ lapply(required_packages, require, character.only = TRUE)
 ############
 
 # nastavit working directory
-path.wd <- "C:/Users/petr/Downloads/RP/RP/"
+path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/"
 setwd(path.wd)
-path.data <- "C:/Users/petr/Downloads/RP/projects-data/"
-path.rgee <- "C:/Users/petr/Documents/pc02/rgee20230227/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
+path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/"
+path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
 # source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/ndop/")
 
@@ -32,7 +32,7 @@ SPH_STAT.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_STAT.
 ############
 # settings
 ############
-ndop.fs <- list("months" = c(4:6), "years" = c(2018:2022), "version" = "v1")
+ndop.fs <- list("months" = c(4:6), "years" = c(2019:2022), "precision" = 1000, "version" = "v1")
 
 
 st_crs(SPH_STAT.source) <- 4326
@@ -124,11 +124,11 @@ ndop_ugc <-
 
 # zvážit jiný filtr garance?
 ndop.ff <- ndop_ugc(
-  years_range = list(from = "2018-01-01", to = "2022-12-31"),
-  season_months_range = list(from = 4, to = 6),
+  years_range = list(from = paste0(min(ndop.fs$years), "-01-01"), to = paste0(max(ndop.fs$years), "-12-31")),
+  season_months_range = list(from = min(ndop.fs$months), to = max(ndop.fs$months)),
   import_path_ndop = ndop.csv.path,
   res_crs = 5514,
-  presicion = 1000
+  presicion = ndop.fs$precision
 )
 
 
@@ -139,108 +139,132 @@ ndop.ff %<>% filter(KAT_TAX == "Ptáci")
 ndop.ff %<>% mutate(AUTOR = tolower(stri_trans_general(str = AUTOR, id = "Latin-ASCII")))
 ndop.ff <- droplevels(ndop.ff)
 
+
 au.base <- unique(as.vector(unlist(ndop.ff$AUTOR)))
 length(au.base)
+## nebudu dělat explode (čárkou) více spoluautorů - dohromady mohou mít jako tým jiné určovací schopnosti, které může jednotlivý autor postrádat a tím bych mohl individuálnímu autoru přiřadit druhy, které sám nepozná
+# AUTOR.unique <- unique(trimws(unlist(strsplit(as.vector(unlist(au.base)), "[,]"))))
+# length(AUTOR.unique)
+au.base.one <- au.base[stri_count_fixed(au.base, " ") == 0]
+print(au.base.one)
+write.csv(au.base.one, file = paste0(path.wd.prep, "autors-check-single-remove.csv"), row.names = FALSE)
+# ponechat jen autory dvou- a víceslovné (u jednoslovných hrozí zgroupování nepříslušných autorů podle křestního jména a nemusí být důvěryhodné)
+au.base.more <- au.base[stri_count_fixed(au.base, " ") > 0]
 
-AUTOR.unique <- unique(trimws(unlist(strsplit(as.vector(unlist(au.base)), "[,]"))))
-length(AUTOR.unique)
+# dofiltr podezřelých a problematických autorů
+length(au.base.more)
+write.csv(au.base.more, file = paste0(path.wd.prep, "autors-check.csv"), row.names = FALSE)
 
-AUTOR.unique.one <- AUTOR.unique[stri_count_fixed(AUTOR.unique, " ") == 0]
-print(AUTOR.unique.one)
-# ponechat jen autory dvou- a víceslovné (u jednoslovných hrozí zgroupování nepříslušných autorů podle křestního jména)
-AUTOR.unique.more <- AUTOR.unique[stri_count_fixed(AUTOR.unique, " ") > 0]
+nrow(ndop.ff) # 425933
+saveRDS(ndop.ff, paste0(path.wd.prep, "ndop.ff.rds"))
+
+
+# pouze víceslovní autoři
+ndop.ff.au.more <- ndop.ff %>% filter(AUTOR %in% au.base.more)
+nrow(ndop.ff.au.more) # 425008
 
 
 
 # počet nálezů na autora
-ndop.ff.occs <- ndop.ff %>%
+ndop.ff.au.more.occs <- ndop.ff.au.more %>%
   group_by(AUTOR) %>%
   summarise(occs = n_distinct(ID_NALEZ)) %>%
   arrange(desc(occs))
+saveRDS(ndop.ff.au.more.occs, paste0(path.wd.prep, "ndop.ff.au.more.occs.rds"))
 
-
-## "lucie" ale nabere všechny lucie... - check pro jednoslovné - problematické
-# nálezy per unique autor (mohou být duplicitně) - jde mi jen o druhovou znalost na autora
-ndop.ff.au.first <- TRUE
-for (au in AUTOR.unique.more) {
-  print(au)
-  ndop.ff.temp <- ndop.ff %>%
-    filter(str_detect(AUTOR, au)) %>%
-    mutate(autor.unique = au)
-
-  if (ndop.ff.au.first) {
-    ndop.ff.au.first <- FALSE
-    ndop.ff.au <- ndop.ff.temp
-  } else {
-    ndop.ff.au %<>% add_row(ndop.ff.temp)
-  }
-}
-
-# počet nálezů na autora (po rozdělení čárkou a dopárování v případě stejného jména)
-ndop.ff.au.occs <- ndop.ff.au %>%
-  group_by(autor.unique) %>%
-  summarise(occs = n_distinct(ID_NALEZ)) %>%
-  arrange(desc(occs))
 
 # počet druhů na autora
-ndop.ff.au.sps <- ndop.ff.au %>%
-  group_by(autor.unique) %>%
+ndop.ff.au.more.sps <- ndop.ff.au.more %>%
+  group_by(AUTOR) %>%
   summarise(sps = n_distinct(DRUH)) %>%
   arrange(desc(sps))
+saveRDS(ndop.ff.au.more.sps, paste0(path.wd.prep, "ndop.ff.au.more.sps.rds"))
 
 
+boxplot(ndop.ff.au.more.occs$occs)
+boxplot(ndop.ff.au.more.sps$sps)
 
-# saveRDS(ndop.ff, paste0(path.wd.prep, "ndop.ff.rds"))
-# saveRDS(ndop.ff.occs, paste0(path.wd.prep, "ndop.ff.occs.rds"))
-# saveRDS(ndop.ff.au, paste0(path.wd.prep, "ndop.ff.au.rds"))
-# saveRDS(ndop.ff.au.occs, paste0(path.wd.prep, "ndop.ff.au.occs.rds"))
+ggplot(ndop.ff.au.more.occs, aes(y = occs)) +
+  geom_boxplot() +
+  scale_y_log10()
+ggplot(ndop.ff.au.more.occs, aes(x = occs)) +
+  geom_histogram() +
+  scale_x_log10()
 
-boxplot(ndop.ff.au.occs$occs)
-boxplot(ndop.ff.au.sps$sps)
 
-
-# trvá dlouho
-ndop.occsXsps <- ndop.ff.au.occs %>% left_join(ndop.ff.au.sps, by = "autor.unique")
 # koreluje počet druhů s počtem nálezů (per autor?)
-plot(sps ~ log(occs), data = ndop.occsXsps)
+ndop.occsXsps <- ndop.ff.au.more.occs %>% left_join(ndop.ff.au.more.sps, by = "AUTOR")
+
+# Default scatter plot
+sp <- ggplot(ndop.occsXsps, aes(x = occs, y = sps)) +
+  geom_point()
+sp + scale_x_continuous(trans = "log10") + scale_y_continuous(trans = "log10")
 
 
 
-# per pixel
+# souřadnice na SF
+ndop.ff.au.more.sf <- ndop.ff.au.more %>% st_as_sf(coords = c("X", "Y"), crs = 5514)
+ndop.ff.au.more.sf %<>% st_transform(st_crs(4326))
 
-ndop.ff.au.sf <- ndop.ff.au %>% st_as_sf(coords = c("X", "Y"), crs = 5514)
+# namapování nálezů na POLE
+ndop.ff.au.more.sf.POLE <- sitmap_2rad.czechia %>% st_join(ndop.ff.au.more.sf)
+ndop.ff.au.more.sf.POLE %<>% filter(!is.na(ID_NALEZ))
 
-ndop.ff.au.sf %<>% st_transform(st_crs(4326))
 
-ndop.ff.au.sf.POLE <- sitmap_2rad.czechia %>% st_join(ndop.ff.au.sf)
+saveRDS(ndop.ff.au.more.sf, paste0(path.wd.prep, "ndop.ff.au.more.sf.rds"))
+saveRDS(ndop.ff.au.more.sf.POLE, paste0(path.wd.prep, "ndop.ff.au.more.sf.POLE.rds"))
 
-ndop.ff.au.sf.POLE %<>% filter(!is.na(ID_NALEZ))
 
-# saveRDS(ndop.ff.au.sf.POLE, paste0(path.wd.prep, "ndop.ff.au.sf.POLE.rds"))
 
-# per pixel
-ndop.ff.au.sf.POLE.pp <- ndop.ff.au.sf.POLE %>%
-  group_by(DRUH, POLE, autor.unique) %>%
+# per pixel - unikátní hodnoty druhů na pixel a autora
+ndop.ff.au.more.sf.POLE.pp <- ndop.ff.au.more.sf.POLE %>%
+  group_by(DRUH, POLE, AUTOR) %>%
   slice_head(n = 1)
+nrow(ndop.ff.au.more.sf.POLE.pp) # 210539
+saveRDS(ndop.ff.au.more.sf.POLE.pp, paste0(path.wd.prep, "ndop.ff.au.more.sf.POLE.pp.rds"))
+
+# jen body (centroidy pixelů)
+ndop.ff.au.more.sf.POLE.pp.c <- ndop.ff.au.more.sf.POLE.pp %>% st_centroid()
+saveRDS(ndop.ff.au.more.sf.POLE.pp.c, paste0(path.wd.prep, "ndop.ff.au.more.sf.POLE.pp.c.rds"))
 
 
-# per pixel
-ndop.ff.au.sf.POLE.pp.c <- ndop.ff.au.sf.POLE.pp %>% st_centroid()
+# per pixel unikátní druhy
+ndop.ff.au.more.sf.POLE.pp.sp <- ndop.ff.au.more.sf.POLE %>%
+  group_by(DRUH, POLE) %>%
+  slice_head(n = 1)
+nrow(ndop.ff.au.more.sf.POLE.pp.sp) #
+saveRDS(ndop.ff.au.more.sf.POLE.pp.sp, paste0(path.wd.prep, "ndop.ff.au.more.sf.POLE.pp.sp.rds"))
 
-# saveRDS(ndop.ff.au.sf.POLE.pp, paste0(path.wd.prep, "ndop.ff.au.sf.POLE.pp.rds"))
-# saveRDS(ndop.ff.au.sf.POLE.pp.c, paste0(path.wd.prep, "ndop.ff.au.sf.POLE.pp.c.rds"))
 
-# ndop.ff.au.sf.POLE.pp.c  <- readRDS(paste0(path.wd.prep, "ndop.ff.au.sf.POLE.pp.c.rds"))
-# ndop.ff.au.sf.POLE <- readRDS(paste0(path.wd.prep, "ndop.ff.au.sf.POLE.rds"))
 
-SPH_STAT.source.s <- st_simplify(SPH_STAT.source, preserveTopology = FALSE, dTolerance = 1000)
-druhy <- unique(as.vector(unlist(ndop.ff.au.sf.POLE$DRUH)))
+# filtrace problematických druhů (malý počet nálezů, název)
+ndop.ff.au.more.sf.POLE.pp.sp.count <- ndop.ff.au.more.sf.POLE.pp.sp %>%
+  st_drop_geometry() %>%
+  group_by(DRUH) %>%
+  count(DRUH) %>%
+  arrange(desc(n))
+saveRDS(ndop.ff.au.more.sf.POLE.pp.sp.count, paste0(path.wd.prep, "ndop.ff.au.more.sf.POLE.pp.sp.count.rds"))
+
+ndop.sp.selected <- ndop.ff.au.more.sf.POLE.pp.sp.count %>%
+  filter(n >= 10) %>%
+  filter(!str_detect(DRUH, "×")) %>%
+  filter(!str_detect(DRUH, "/")) %>%
+  filter(!str_detect(DRUH, "sp\\."))
+saveRDS(ndop.sp.selected, paste0(path.wd.prep, "ndop.sp.selected.rds"))
+
+
+#
+# vizualizace map TGOB (per pixel occs) a presencí
+#
+SPH_STAT.source.s <- st_simplify(SPH_STAT.source, preserveTopology = FALSE, dTolerance = 0.001)
+# druhy <- unique(as.vector(unlist(ndop.ff.au.more.sf.POLE$DRUH)))
+druhy <- unique(as.vector(unlist(ndop.sp.selected$DRUH)))
 first <- TRUE
 for (druh in druhy) {
   print(druh)
-  pres <- ndop.ff.au.sf.POLE.pp.c %>% filter(DRUH == druh)
-  pres.au <- unique(as.vector(unlist(pres$autor.unique)))
-  tgob <- ndop.ff.au.sf.POLE.pp.c %>% filter(autor.unique %in% pres.au)
+  pres <- ndop.ff.au.more.sf.POLE.pp.c %>% filter(DRUH == druh)
+  pres.au <- unique(as.vector(unlist(pres$AUTOR)))
+  tgob <- ndop.ff.au.more.sf.POLE.pp.c %>% filter(AUTOR %in% pres.au)
   pres.unique <- pres %>%
     group_by(POLE) %>%
     slice_head(n = 1)
@@ -271,23 +295,33 @@ for (druh in druhy) {
   pl <- tgob.count %>% dplyr::select(pp)
 
   ggpl <- ggplot() +
-    geom_sf(data = SPH_STAT.source.s, fill = "#F0F0F0") +
-    geom_sf(data = pl, aes(colour = pp), pch = 15, size = 2, ) +
-    labs(color = "TGB (log10)", caption = "NDOP (2018-2022)") +
+    geom_sf(data = SPH_STAT.source.s, fill = "LightBlue") +
+    geom_sf(data = pl, aes(colour = pp), pch = 15, size = 2) +
+    labs(color = "TGOB (log10)", caption = paste0("occs source: AOPK NDOP (years: ", min(ndop.fs$years), "-", max(ndop.fs$years), "; months: ", min(ndop.fs$months), "-", max(ndop.fs$months), ") | author: Petr Balej | WGS84 | grid: KFME (SitMap_2Rad) | generated: ", Sys.Date())) +
     scale_colour_gradient(low = "white", high = "red", trans = "log10") +
     theme_light() +
     geom_sf(data = pres.unique) +
-    theme(plot.title = element_text(hjust = 0.5)) +
-    ggtitle(paste0(druh, " \n", nrow(pres.unique), " / ", nrow(tgob.unique)))
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 30, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5)
+    ) +
+    ggtitle(
+      label = (druh),
+      subtitle = paste0("TGOB (same species observers occs per pixel) | ", nrow(pres.unique), " / ", nrow(tgob.unique))
+    )
 
-  png(paste0(path.wd.prep, "tgob-", str_replace_all(druh, "[\\/\\:]", "_"), ".png"), width = 1500, height = 700)
+  png(paste0(path.wd.prep, "tgob/tgob-", str_replace_all(druh, "[\\/\\:]", "_"), ".png"), width = 1200, height = 700)
 
   print(ggpl)
   dev.off()
 }
 
-# saveRDS(df.out, paste0(path.wd.prep, "df.out.rds"))
-# write.csv(df.out, paste0(path.wd.prep, "df.out.csv"))
+
+saveRDS(df.out, paste0(path.wd.prep, "df.out.rds"))
+write.csv(df.out, paste0(path.wd.prep, "df.out.csv"))
+
+
+
 
 # uložení rozdělených dat per species pro model
 
@@ -303,88 +337,6 @@ plot(sitmap_2rad.czechia)
 ############
 
 
-
-
-
-#
-# LSD
-#
-
-nrow(lsd.source)
-
-# základní filtr
-lsd.filter <- lsd.source %>%
-  filter(grepl("^[0-9]{4}[a-d]{2}", SiteName) &
-    !is.na(Lon) &
-    !is.na(Lat) &
-    UncertainIdent != 1) %>%
-  mutate(POLE = substr(SiteName, start = 1, stop = 6))
-
-nrow(lsd.filter)
-
-# alespoň více než x minut (vyřešeny časy přes půlnoc do nového dne)
-lsd.filter %<>% mutate(dt = ifelse((TimeEnd - TimeStart) / 60 > 0, (TimeEnd - TimeStart) / 60, (TimeEnd - TimeStart + 60 * 60 * 24) / 60)) %>% filter(dt >= lsd.fs[["minMin"]])
-
-nrow(lsd.filter)
-
-# jaro+roky
-lsd.filter %<>% filter(Year %in% lsd.fs[["years"]] & Month %in% lsd.fs[["months"]])
-nrow(lsd.filter)
-
-# aspoň X návštěv na pole...
-POLE.ObsListsID.freq <- lsd.filter %>%
-  group_by(POLE) %>%
-  summarise(visits = n_distinct(ObsListsID)) %>%
-  # arrange(desc(visits)) %>%
-  filter(visits >= lsd.fs[["minSurveys"]])
-
-nrow(POLE.ObsListsID.freq)
-
-lsd.filter %<>% filter(POLE %in% POLE.ObsListsID.freq$POLE)
-nrow(lsd.filter)
-
-
-
-
-
-
-#
-# sitmap_2rad
-#
-
-# potřebuju jen POLE
-sitmap_2rad.filter <- sitmap_2rad.source %>% dplyr::select(POLE)
-sitmap_2rad.filter %<>% st_transform(st_crs(4326))
-
-
-# potřebuju jen geometrii
-SPH_STAT.filter <- SPH_STAT.source %<>% dplyr::select(-everything())
-st_crs(SPH_STAT.filter) <- 4326
-SPH_KRAJ.filter <- SPH_KRAJ.source %<>% dplyr::select(-everything())
-st_crs(SPH_KRAJ.filter) <- 4326
-
-# jen kvadráty v ČR
-sitmap_2rad.filter %<>% filter(st_intersects(geometry, SPH_STAT.filter, sparse = FALSE))
-nrow(sitmap_2rad.filter)
-
-
-
-#
-# průběžný overview
-#
-sitmap_2rad.filter.ow <- sitmap_2rad.filter %>% filter(POLE %in% POLE.ObsListsID.freq$POLE)
-
-png(paste0(path.wd.prep, "overview.png"), width = 1000, height = 800)
-plot(SPH_KRAJ.filter, main = paste0(nrow(sitmap_2rad.filter), " / ", nrow(sitmap_2rad.filter.ow)))
-par(new = TRUE)
-plot(sitmap_2rad.filter.ow %>% dplyr::select(-everything()), add = TRUE, col = "red")
-dev.off()
-
-st_write(SPH_STAT.filter, paste0(path.wd.prep, "overview-stat.shp"))
-st_write(SPH_KRAJ.filter, paste0(path.wd.prep, "overview-kraj.shp"))
-st_write(sitmap_2rad.filter.ow, paste0(path.wd.prep, "overview-selected-2rad.shp"))
-
-saveRDS(lsd.filter, paste0(path.wd.prep, "overview-lsd.filter.rds"))
 
 
 stop()
