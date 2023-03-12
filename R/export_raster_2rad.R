@@ -558,3 +558,16 @@ saveRDS(rs, paste0(path.wd, "dataPrep/observerSkill/pcamap6.rds"))
 rr <- writeRaster(rs, paste0(path.wd, "dataPrep/observerSkill/pcamap6.rds"), format = "raster", overwrite = TRUE)
 hdr(rr, format = "ENVI")
 
+
+
+library(usdm)
+raster_stack <- readRDS(paste0(path.wd, "dataPrep/observerSkill/preds_final.rds"))
+
+vs <- vifstep(raster_stack, th=2)
+# vc <- vifcor(raster_stack[[vs@results$Variables]], th=0.7)
+
+rs <- raster_stack[[vs@results$Variables]]
+saveRDS(rs, paste0(path.wd, "dataPrep/observerSkill/vifstep2.rds"))
+rr <- writeRaster(rs, paste0(path.wd, "dataPrep/observerSkill/vifstep2.rds"), format = "raster", overwrite = TRUE)
+hdr(rr, format = "ENVI")
+
