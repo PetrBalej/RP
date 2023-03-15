@@ -80,6 +80,7 @@ lsd.filter %<>%
   filter(!str_detect(TaxonNameLAT, "×")) %>%
   filter(!str_detect(TaxonNameLAT, "/")) %>%
   filter(!str_detect(TaxonNameLAT, "sp\\.")) %>%
+  filter(!str_detect(TaxonNameLAT, "f\\. domestica")) %>%
   filter(TaxonNameLAT != "Ondatra zibethica")
 nrow(lsd.filter)
 
