@@ -34,7 +34,7 @@ path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # "D:/PERSONAL_DATA/p
 # source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/ndopTGOB/")
 path.wd.prep.ndop <- paste0(path.wd, "dataPrep/ndop/")
-
+source(paste0(path.wd, "shared.R"))
 
 ############
 # inputs
@@ -70,14 +70,7 @@ ndop.sp.selected <- readRDS(paste0(path.wd.prep.ndop, "ndop.sp.selected.rds"))
 #   SSOOG - shared species-observers occurrences group ~ Shared species-observers sampling effort
 
 
-# ks - kernel smoothing
-# všechny varianty ks navíc mají ještě "null" a podvarianty dupl+uniq
-vn <- list(
-    "1" = "TGOB_ks_CZ_5000", "2" = "TGOB_ks_SSOOGclip_5000",
-    "3" = "SSOOG_ks_CZ_5000", "4" = "SSOOG_ks_CZ_SSOOG", "5" = "SSOOG_ks_CZ_P",
-    "6" = "SSOOG_ks_SSOOGclip_5000", "7" = "SSOOG_ks_SSOOGclip_SSOOG", "8" = "SSOOG_ks_SSOOGclip_P",
-    "9" = "TGOB_x_CZ_TGOB+TGOB_x_SSOOGclip_SSOOG" # dodatečně rozdělit?
-)
+vn <- versionNames()
 
 vf <- list("1" = 1:8, "0" = 9)
 
