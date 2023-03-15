@@ -187,6 +187,7 @@ set.seed(123)
 druhy <- sample(druhy)
 speciesParts <- split(druhy, ceiling(seq_along(druhy) / ndop.fs$speciesPerGroup))
 
+# "tradiční" TGOB - použít jako BG všechny unikátní per_pixel presence všech druhů (NDOP pokrývá cca 85% území s cca 7300 pixely (z 9700)), takže je to zde upočitatelné
 tgob.trad <- ndop.ff.au.more.sf.POLE.pp.c %>%
     group_by(POLE) %>%
     slice_head(n = 1)
@@ -213,6 +214,7 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
     pres.unique <- pres %>%
         group_by(POLE) %>%
         slice_head(n = 1)
+    # skill verze tradičního TGOB - všechny unikátní pixely do BG // TODO zbytečné, stačilo by použít níže tgob.count!!!
     tgob.unique <- tgob %>%
         group_by(POLE) %>%
         slice_head(n = 1)
@@ -227,7 +229,6 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
 
     df.temp <- as.data.frame(st_coordinates(pres.unique))
     names(df.temp) <- ll
-
 
     bf.v0 <- rasterize(pl, pcamap6[[1]], field = "pp", fun = "last", background = NA, mask = FALSE) # nakonec přímo nepoužívám, protože tento (normalizovaný (0-1) per_pixel počet nálezů) odpovídá smoothingu adjust=0.01 (asi ještě ověřit individuálně pro všechny druhy?)
 
