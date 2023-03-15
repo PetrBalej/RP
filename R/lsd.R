@@ -13,18 +13,19 @@ lapply(required_packages, require, character.only = TRUE)
 ############
 
 # nastavit working directory
-path.wd <- "C:/Users/petr/Documents/pc02/projects/"
+path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/"
 setwd(path.wd)
-path.data <- "C:/Users/petr/Documents/pc02/projects-data/"
-path.rgee <- "C:/Users/petr/Documents/pc02/rgee20230223/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
+path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
+path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
 # source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/lsd/")
 
 ############
 # inputs
 ############
-lsd.source <- read_delim(paste0(path.data, "lsd/export-20230223.csv"), delim = ";")
-sitmap_2rad.source <- st_read(paste0(path.data, "aopk/sitmap_2rad/sitmap_2rad.shp")) # 5514
+lsd.source <- read_delim(paste0(path.data, "lsd/export-20230223.csv"), delim = ";", locale = locale(encoding = "Windows-1250")) #  ISO-8859-2
+
+sitmap_2rad.czechia <- readRDS(paste0(path.wd, "dataPrep/sitmap_2rad/sitmap_2rad-czechia.rds"))
 SPH_STAT.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_STAT.shp"))
 SPH_KRAJ.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_KRAJ.shp"))
 
@@ -74,13 +75,13 @@ nrow(POLE.ObsListsID.freq)
 lsd.filter %<>% filter(POLE %in% POLE.ObsListsID.freq$POLE)
 nrow(lsd.filter)
 
-#
-# sitmap_2rad
-#
-
-# potřebuju jen POLE
-sitmap_2rad.filter <- sitmap_2rad.source %>% dplyr::select(POLE)
-sitmap_2rad.filter %<>% st_transform(st_crs(4326))
+# filtrace problematických druhů (název)
+lsd.filter %<>%
+  filter(!str_detect(TaxonNameLAT, "×")) %>%
+  filter(!str_detect(TaxonNameLAT, "/")) %>%
+  filter(!str_detect(TaxonNameLAT, "sp\\.")) %>%
+  filter(TaxonNameLAT != "Ondatra zibethica")
+nrow(lsd.filter)
 
 
 # potřebuju jen geometrii
@@ -89,26 +90,21 @@ st_crs(SPH_STAT.filter) <- 4326
 SPH_KRAJ.filter <- SPH_KRAJ.source %<>% dplyr::select(-everything())
 st_crs(SPH_KRAJ.filter) <- 4326
 
-# jen kvadráty v ČR
-sitmap_2rad.filter %<>% filter(st_intersects(geometry, SPH_STAT.filter, sparse = FALSE))
-nrow(sitmap_2rad.filter)
-
-
 
 #
 # průběžný overview
 #
-sitmap_2rad.filter.ow <- sitmap_2rad.filter %>% filter(POLE %in% POLE.ObsListsID.freq$POLE)
+sitmap_2rad.czechia.ow <- sitmap_2rad.czechia %>% filter(POLE %in% POLE.ObsListsID.freq$POLE)
 
 png(paste0(path.wd.prep, "overview.png"), width = 1000, height = 800)
-plot(SPH_KRAJ.filter, main = paste0(nrow(sitmap_2rad.filter), " / ", nrow(sitmap_2rad.filter.ow)))
+plot(SPH_KRAJ.filter, main = paste0(nrow(sitmap_2rad.czechia), " / ", nrow(sitmap_2rad.czechia.ow)))
 par(new = TRUE)
-plot(sitmap_2rad.filter.ow %>% dplyr::select(-everything()), add = TRUE, col = "red")
+plot(sitmap_2rad.czechia.ow %>% dplyr::select(-everything()), add = TRUE, col = "red")
 dev.off()
 
 st_write(SPH_STAT.filter, paste0(path.wd.prep, "overview-stat.shp"))
 st_write(SPH_KRAJ.filter, paste0(path.wd.prep, "overview-kraj.shp"))
-st_write(sitmap_2rad.filter.ow, paste0(path.wd.prep, "overview-selected-2rad.shp"))
+st_write(sitmap_2rad.czechia.ow, paste0(path.wd.prep, "overview-selected-2rad.shp"))
 
 saveRDS(lsd.filter, paste0(path.wd.prep, "overview-lsd.filter.rds"))
 
@@ -127,17 +123,41 @@ spCounts <- lsd.filter.oneTaxonOccPerPOLE %>%
   arrange(desc(spCount)) %>%
   filter(spCount >= 10)
 
+# cross check - odpovídají názvy kvadrátů ze SiteName reálně poloze (Lat, Lon)?
+lsd.filter.anti <- lsd.filter %>% anti_join(sitmap_2rad.czechia, by = "POLE")
+if (nrow(lsd.filter.anti > 0)) {
+  print("Všechny kódy kvadrátů neodpovídají síti!")
+  print(lsd.filter.anti)
+}
 
+lsd.filter.oneTaxonOccPerPOLE.simple <- lsd.filter.oneTaxonOccPerPOLE %>% dplyr::select(POLE, TaxonNameLAT)
 
+#
+# odvození absencí
+#
+"%notin%" <- Negate("%in%")
+lsd.filter.oneTaxonOccPerPOLE.simple %<>% ungroup()
+lsd.filter.oneTaxonOccPerPOLE.simple$presence <- 1
 
+lsd.filter.species <- unique(lsd.filter.oneTaxonOccPerPOLE.simple$TaxonNameLAT)
+lsd.pa <- lsd.filter.oneTaxonOccPerPOLE.simple
+for (sp in lsd.filter.species) {
+  sp.presences <- lsd.filter.oneTaxonOccPerPOLE.simple %>% filter(TaxonNameLAT == sp)
+  sp.absences <- lsd.filter.oneTaxonOccPerPOLE.simple %>%
+    filter(POLE %notin% sp.presences$POLE) %>%
+    distinct(POLE)
 
-stop()
-# TODO: cross check - odpovídají názvy kvadrátů ze SiteName reálně poloze (Lat, Lon)? - udělat i prostorový průnik se sítí
-lsd.filter %>% left_join(sitmap_2rad.source, by = "POLE")
+  sp.absences$TaxonNameLAT <- sp
+  sp.absences$presence <- 0
 
-st.sitmap_2rad.centroids <- st_centroid(st.sitmap_2rad)
+  lsd.pa %<>% add_row(sp.absences)
+}
 
-# minimum x presenci a y absencí - možné až po získání prediktorů a "děr"
+lsd.pa.polygons <- st_as_sf(lsd.pa %>% left_join(sitmap_2rad.czechia, by = "POLE"))
+saveRDS(lsd.pa.polygons, paste0(path.wd.prep, "lsd.pa.polygons.rds"))
+lsd.pa.centroids <- lsd.pa.polygons
+lsd.pa.centroids <- st_as_sf(lsd.pa.centroids %<>% mutate(geometry = st_centroid(geometry)))
+saveRDS(lsd.pa.centroids, paste0(path.wd.prep, "lsd.pa.centroids.rds"))
 
 # + remove spatialy autocorrelated squares - geographically/environmentally
 # alespoň reprezentativnost vůči altitude a landcoveru?
