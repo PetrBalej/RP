@@ -59,12 +59,34 @@ ndop.sp.selected <- readRDS(paste0(path.wd.prep.ndop, "ndop.sp.selected.rds"))
 ############
 # settings
 ############
+# potřebuju být schopný dofiltrovat svou inovaci, null, Botellu, tradiční tgb jako varianty k porovnání
+# a být schopen vybrat z různých adjust fittigů 1) prior dobrou variantu (nevím jak to dělá Botella?!) (+ porovnat i post nej validatci LSD)
+
+# Botella et al. (2020):
+#   UB – Uniform Bias - uniformly distributed background points (UB).
+#   TGB – Target Group Bias - background points as the *sites* where there has been at least one presence among a Target-Group of species (sites je myšlena jedna konkrétní samplovaná lokalita) =“event”/“akce” – nutné znát, jinak jde o TGOB)
+#   TGOB - Target-Group Occurrences Background - integrate all species *occurrences* from the Target-Group as background (jednotlivé nálezy, occurrences)
+# PB:
+#   SSOOG - shared species-observers occurrences group ~ Shared species-observers sampling effort
+
+
+# ks - kernel smoothing
+# všechny varianty ks navíc mají ještě "null" a podvarianty dupl+uniq
+vn <- list(
+    "1" = "TGOB_ks_CZ_5000", "2" = "TGOB_ks_SSOOGclip_5000",
+    "3" = "SSOOG_ks_CZ_5000", "4" = "SSOOG_ks_CZ_SSOOG", "5" = "SSOOG_ks_CZ_P",
+    "6" = "SSOOG_ks_SSOOGclip_5000", "7" = "SSOOG_ks_SSOOGclip_SSOOG", "8" = "SSOOG_ks_SSOOGclip_P",
+    "9" = "TGOB_x_CZ_TGOB+TGOB_x_SSOOGclip_SSOOG" # dodatečně rozdělit?
+)
+
+vf <- list("1" = 1:8, "0" = 9)
 
 ndop.fs <- list(
     "adjusts" = c(0.01, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5),
     "tuneArgs" = list(fc = c("L", "LQ"), rm = c(1, 2, 3, 5, 10)),
     "bg" = 5000, "speciesPerGroup" = 9, "speciesOccMin" = 30,
-    "speciesPart" = cmd_arg, "version" = "v1"
+    "speciesPart" = cmd_arg, "version" = "v1",
+    "versionNames" = vn, "versionSmooting" = vf
 )
 
 ############
