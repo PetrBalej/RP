@@ -31,7 +31,7 @@ path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb
 setwd(path.wd)
 path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
 path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
-# source(paste0(path.rgee, "R/export_raster/functions.R"))
+source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/ndopTGOB/")
 path.wd.prep.ndop <- paste0(path.wd, "dataPrep/ndop/")
 source(paste0(path.wd, "shared.R"))
@@ -52,9 +52,13 @@ ndop.ff.au.more.sf <- readRDS(paste0(path.wd.prep.ndop, "ndop.ff.au.more.sf.rds"
 ndop.ff.au.more.sf.POLE.pp <- readRDS(paste0(path.wd.prep.ndop, "ndop.ff.au.more.sf.POLE.pp.rds"))
 # jen body (centroidy pixelů)
 ndop.ff.au.more.sf.POLE.pp.c <- readRDS(paste0(path.wd.prep.ndop, "ndop.ff.au.more.sf.POLE.pp.c.rds"))
-# vybrané druhy
-ndop.sp.selected <- readRDS(paste0(path.wd.prep.ndop, "ndop.sp.selected.rds"))
 
+# vybrané druhy (musím znovu přepočítat po odebrání LSD)
+ndop.ff.au.more.sf.POLE.pp.sp <- readRDS(paste0(path.wd.prep.ndop, "ndop.ff.au.more.sf.POLE.pp.sp.rds"))
+
+### LSD pro filtraci druhů které lze ověřit
+lsd.pa.min <- readRDS(paste0(path.wd, "dataPrep/lsd/lsd.pa.min.rds"))
+lsd.POLE <- st_read(paste0(path.wd, "dataPrep/lsd/overview-selected-2rad.shp"))
 
 ############
 # settings
@@ -86,7 +90,39 @@ ndop.fs <- list(
 # execution
 ############
 
-ndop.sp.selected %<>% filter(n >= ndop.fs$speciesOccMin)
+# odstranit LSD sites z rastru prediktorů - jen pro generování tgob/ssoob
+lsd.POLE.c <- st_centroid(lsd.POLE)
+pcamap6.lsdClip <- stack(mask(pcamap6, lsd.POLE.c, inverse = TRUE))
+
+"%notin%" <- Negate("%in%")
+# odstraním prezence (sites) LSD z NDOP pro zabráníení spatial (auto)correlation - LSD tak bude i prostorově nezávislý dataset
+ndop.ff.au.more.sf.POLE.pp.c %<>% ungroup() %>% filter(POLE %notin% lsd.POLE$POLE)
+
+
+# musím znovu spočítat počty presencí po odebrání LSD sites
+ndop.sp.selected <- ndop.ff.au.more.sf.POLE.pp.sp %>%
+    ungroup() %>%
+    filter(POLE %notin% lsd.POLE$POLE) %>%
+    st_drop_geometry() %>%
+    group_by(DRUH) %>%
+    count(DRUH) %>%
+    arrange(desc(n))
+
+ndop.sp.selected %<>% filter(n >= ndop.fs$speciesOccMin) %>% filter(DRUH %in% unique(ndop.ff.au.more.sf.POLE.pp.c$DRUH))
+
+### vybrat pouze druhy z LSD
+# sjednocení synonym LSD
+lsd.pa.min %<>% rename(species = TaxonNameLAT)
+lsd.pa.min.syn <- synonyms_unite(lsd.pa.min)
+lsd.pa.min.syn.species <- unique(lsd.pa.min.syn$species)
+# alespoň 10 presencí a 10 absencí - doplnit do lsd.R a tam vygenerovat
+
+# sjednocení synonym NDOP
+ndop.sp.selected %<>% rename(species = DRUH)
+ndop.sp.selected <- synonyms_unite(ndop.sp.selected)
+
+ndop.sp.selected %<>% filter(species %in% lsd.pa.min.syn.species)
+ndop.sp.selected %<>% rename(DRUH = species)
 
 # druhy s malým počtem presencí se počítají mnohem rychleji, chci tyto per group upřednostnit (seřadit rovnoměrně v rámci skupin druhy od nejméně početných)
 ndop.sp.selected %<>% arrange(n)
@@ -157,14 +193,14 @@ smoothingRP <- function(raster.template, adjusts, occs.sf, nback = 5000) {
 
     raster_stack.bias.col <- list()
     bg <- list()
-    ppp.deg.distance <- bw.scott.iso(res.ndop.coords.ppp)
+    ppp.deg.distance <- bw.scott(res.ndop.coords.ppp)
     prague <- c(14.4, 50.0)
     # vzdálenosti v jednotkovém ppp na jedné lat a lon
-    d.lon <- distHaversine(c(prague[1], prague[2] - ppp.deg.distance), c(prague[1], prague[2]))
-    d.lat <- distHaversine(c(prague[1] - ppp.deg.distance, prague[2]), c(prague[1], prague[2]))
+    d.lon <- distHaversine(c(prague[1], prague[2] - ppp.deg.distance[2]), c(prague[1], prague[2]))
+    d.lat <- distHaversine(c(prague[1] - ppp.deg.distance[1], prague[2]), c(prague[1], prague[2]))
     # 0.001 a 0.01 jsou 100% korelované
     for (adj in adjusts) {
-        raster_stack.bias <- resample(raster(density.ppp(res.ndop.coords.ppp, sigma = bw.scott.iso(res.ndop.coords.ppp), adjust = adj)), raster.template, method = "bilinear")
+        raster_stack.bias <- resample(raster(density.ppp(res.ndop.coords.ppp, sigma = bw.scott(res.ndop.coords.ppp), adjust = adj)), raster.template, method = "bilinear")
         crs(raster_stack.bias) <- rcrs
         raster_stack.bias <- mask(crop(raster_stack.bias, extent(raster.template)), raster.template)
         raster_stack.bias <- setMinMax(raster_stack.bias)
@@ -185,8 +221,8 @@ smoothingRP <- function(raster.template, adjusts, occs.sf, nback = 5000) {
 
 
 # klasický celkový TGOB pro všechny druhy naráz
-bf.all <- smoothingRP(pcamap6[[1]], ndop.fs$adjusts, ndop.ff.au.more.sf, nback = ndop.fs$bg)
-bf.all$bg[["0"]] <- generateRPall(pcamap6[[1]], nback = ndop.fs$bg, random = TRUE) # přidám random body pro "null" model
+bf.all <- smoothingRP(pcamap6.lsdClip[[1]], ndop.fs$adjusts, ndop.ff.au.more.sf, nback = ndop.fs$bg)
+bf.all$bg[["0"]] <- generateRPall(pcamap6.lsdClip[[1]], nback = ndop.fs$bg, random = TRUE) # přidám random body pro "null" model
 
 saveRDS(bf.all, paste0(path.wd.prep, "bf.all-", cmd_arg, ".rds")) # asi zbytečné ukládat duplicitně pro každou skupinu...
 
@@ -245,7 +281,7 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
     df.temp <- as.data.frame(st_coordinates(pres.unique))
     names(df.temp) <- ll
 
-    bf.v0 <- rasterize(pl, pcamap6[[1]], field = "pp", fun = "last", background = NA, mask = FALSE) # nakonec přímo nepoužívám, protože tento (normalizovaný (0-1) per_pixel počet nálezů) odpovídá smoothingu adjust=0.01 (asi ještě ověřit individuálně pro všechny druhy?)
+    bf.v0 <- rasterize(pl, pcamap6.lsdClip[[1]], field = "pp", fun = "last", background = NA, mask = FALSE) # nakonec přímo nepoužívám, protože tento (normalizovaný (0-1) per_pixel počet nálezů) odpovídá smoothingu adjust=0.01 (asi ještě ověřit individuálně pro všechny druhy?)
 
     # normalizace
     r.min <- minValue(bf.v0)
@@ -274,14 +310,14 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
     # TODO následující (3-8) zjednodušit co cyklu!
 
     ############ 3+4+5) tgob.skill cela CR s variantami počtu TGOB
-    bf.skill.v1 <- smoothingRP(pcamap6[[1]], ndop.fs$adjusts, tgob, nback = ndop.fs$bg)
-    bf.skill.v1$bg[["0"]] <- generateRPall(pcamap6[[1]], nback = ndop.fs$bg, random = TRUE)
+    bf.skill.v1 <- smoothingRP(pcamap6.lsdClip[[1]], ndop.fs$adjusts, tgob, nback = ndop.fs$bg)
+    bf.skill.v1$bg[["0"]] <- generateRPall(pcamap6.lsdClip[[1]], nback = ndop.fs$bg, random = TRUE)
     bg.col[["3"]] <- bf.skill.v1
-    bf.skill.v2 <- smoothingRP(pcamap6[[1]], ndop.fs$adjusts, tgob, nback = nrow(tgob))
-    bf.skill.v2$bg[["0"]] <- generateRPall(pcamap6[[1]], nback = nrow(tgob), random = TRUE)
+    bf.skill.v2 <- smoothingRP(pcamap6.lsdClip[[1]], ndop.fs$adjusts, tgob, nback = nrow(tgob))
+    bf.skill.v2$bg[["0"]] <- generateRPall(pcamap6.lsdClip[[1]], nback = nrow(tgob), random = TRUE)
     bg.col[["4"]] <- bf.skill.v2
-    bf.skill.v3 <- smoothingRP(pcamap6[[1]], ndop.fs$adjusts, tgob, nback = nrow(pres.unique))
-    bf.skill.v3$bg[["0"]] <- generateRPall(pcamap6[[1]], nback = nrow(pres.unique), random = TRUE)
+    bf.skill.v3 <- smoothingRP(pcamap6.lsdClip[[1]], ndop.fs$adjusts, tgob, nback = nrow(pres.unique))
+    bf.skill.v3$bg[["0"]] <- generateRPall(pcamap6.lsdClip[[1]], nback = nrow(pres.unique), random = TRUE)
     bg.col[["5"]] <- bf.skill.v3
 
     ############ 6+7+8) tgob.skill orez jen na skill s variantami počtu TGOB
@@ -295,12 +331,15 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
     bf.skill.v3s$bg[["0"]] <- generateRPall(pcamap6.skill[[1]], nback = nrow(pres.unique), random = TRUE)
     bg.col[["8"]] <- bf.skill.v3s
 
-    ############ 9) tradiční TGOB ze všech bodů nefitované + omezené skillem
+    ############ 9) tgobAll tradiční TGOB ze všech bodů nefitované + omezené skillem
     bf.trad <- list()
-    bf.trad$bg[["tgobAll"]][["uniq"]] <- tgob.trad$geometry
-    bf.trad$bg[["tgobSkill"]][["uniq"]] <- tgob.unique$geometry
+    bf.trad$bg[["x"]][["uniq"]] <- tgob.trad$geometry
     bg.col[["9"]] <- bf.trad
 
+    ############ 10) tgobSkill
+    bf.trad.u <- list()
+    bf.trad.u$bg[["x"]][["uniq"]] <- tgob.unique$geometry
+    bg.col[["10"]] <- bf.trad.u
     gc()
     # run vsech variant BG s ENMeval
     for (v1 in names(bg.col)) {

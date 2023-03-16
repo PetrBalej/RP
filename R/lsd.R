@@ -17,7 +17,7 @@ path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb
 setwd(path.wd)
 path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
 path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
-# source(paste0(path.rgee, "R/export_raster/functions.R"))
+source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/lsd/")
 
 ############
@@ -32,7 +32,7 @@ SPH_KRAJ.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_KRAJ.
 ############
 # settings
 ############
-lsd.fs <- list("minMin" = 50, "months" = c(4:6), "years" = c(2018:2022), "minSurveys" = 4, "version" = "v1")
+lsd.fs <- list("minMin" = 50, "months" = c(4:6), "years" = c(2018:2022), "minSurveys" = 4, "minPA" = 10, "version" = "v1")
 
 ############
 # execution
@@ -117,12 +117,12 @@ saveRDS(lsd.filter, paste0(path.wd.prep, "overview-lsd.filter.rds"))
 lsd.filter.oneTaxonOccPerPOLE <- lsd.filter %>%
   group_by(POLE, TaxonNameLAT) %>%
   slice_head(n = 1)
-# aspoň X návštěv na pole...
-spCounts <- lsd.filter.oneTaxonOccPerPOLE %>%
-  group_by(TaxonNameLAT) %>%
-  summarise(spCount = n_distinct(ObsListsID)) %>%
-  arrange(desc(spCount)) %>%
-  filter(spCount >= 10)
+## aspoň X návštěv na pole...
+# spCounts <- lsd.filter.oneTaxonOccPerPOLE %>%
+#  group_by(TaxonNameLAT) %>%
+#  summarise(spCount = n_distinct(ObsListsID)) %>%
+#  arrange(desc(spCount)) %>%
+#  filter(spCount >= 10)
 
 # cross check - odpovídají názvy kvadrátů ze SiteName reálně poloze (Lat, Lon)?
 lsd.filter.anti <- lsd.filter %>% anti_join(sitmap_2rad.czechia, by = "POLE")
@@ -160,6 +160,14 @@ lsd.pa.centroids <- lsd.pa.polygons
 lsd.pa.centroids <- st_as_sf(lsd.pa.centroids %<>% mutate(geometry = st_centroid(geometry)))
 saveRDS(lsd.pa.centroids, paste0(path.wd.prep, "lsd.pa.centroids.rds"))
 
+# alespoň 10 presencí nebo 10 absencí
+lsd.pa.min <- as_tibble(lsd.pa.centroids) %>%
+  group_by(TaxonNameLAT) %>%
+  summarize(np = sum(presence), na = sum(presence == 0)) %>%
+  filter(np >= lsd.fs$minPA & na >= lsd.fs$minPA)
+saveRDS(lsd.pa.min, paste0(path.wd.prep, "lsd.pa.min.rds"))
+
+stop()
 # + remove spatialy autocorrelated squares - geographically/environmentally
 # alespoň reprezentativnost vůči altitude a landcoveru?
 

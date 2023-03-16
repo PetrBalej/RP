@@ -1,4 +1,3 @@
-
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
@@ -20,8 +19,9 @@ path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/" # "D:/PER
 path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
 source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/ndopTGOBeval/")
-path.wd.prep.tgob <- paste0(path.wd, "dataPrep/ndopTGOB/")
 path.wd.prep.ndop <- paste0(path.wd, "dataPrep/ndop/")
+source(paste0(path.wd, "shared.R"))
+path.wd.prep.tgobEval <- paste0(path.wd, "dataPrep/ndopTGOBeval/")
 path.temp.res <- "/home/petr/Downloads/delete/paper1/ndopTGOB - kopie/"
 source(paste0(path.wd, "shared.R"))
 ############
@@ -47,7 +47,7 @@ ndop.fs <- list("version" = "v1")
 # sjednocení synonym LSD
 lsd.pa.centroids %<>% rename(species = TaxonNameLAT)
 lsd.pa.centroids.syn <- synonyms_unite(lsd.pa.centroids)
-
+lsd.pa.centroids.syn.species <- unlist(unique(lsd.pa.centroids.syn$species))
 # načtení RDS Z ENMeval
 rds_list <-
     list.files(
@@ -59,38 +59,54 @@ rds_list <-
 
 # cyklíme...
 for (fpath in rds_list) {
+    rds.r <- list()
     # zabránit zbytečnému načtení RDS, pokud druh není v LSD
     fname <- unlist(strsplit(basename(fpath), "_")) # na druhé pozici je druh
     species.syn <- synonyms_unite(as.data.frame(list("species" = fname[2])))
-    if (nrow(lsd.pa.centroids.syn %>% filter(species == species.syn[1, 1])) != 1) {
+    if (sum(lsd.pa.centroids.syn.species %in% species.syn[1, 1]) < 1) {
         print("Není v LSD:")
         print(fname[2])
         next
     }
 
     rds.l <- readRDS(fpath)
-    species <- names(rds.l)
+    sp <- names(rds.l)
 
-    if (length(species) > 1) {
+    if (length(sp) > 1) {
         print("Více druhů v jednom souboru!")
         stop()
     }
 
-    print(species)
+    lsd.temp <- lsd.pa.centroids.syn %>% filter(species == sp)
 
-    for (version in names(rds.l[[species]])) {
-        for (adjust in names(rds.l[[species]][[version]])) {
-            for (duplORnot in names(rds.l[[species]][[version]][[adjust]])) {
-                for (layer in names(rds.l[[species]][[version]][[adjust]][[duplORnot]]@predictions)) {
-                    r.temp <- rds.l[[species]][[version]][[adjust]][[duplORnot]]@predictions[[layer]]
+    print("++++++++++++++++++++++++++++++++++++++++++++++++")
+    print(sp)
 
-                    # sdm::evaluates(observed, predicted)
+    for (version in names(rds.l[[sp]])) {
+        print("version: -------------------------")
+        print(version)
+        for (adjust in names(rds.l[[sp]][[version]])) {
+            print(adjust)
+            for (duplORnot in names(rds.l[[sp]][[version]][[adjust]])) {
+                print(duplORnot)
+                for (layer in names(rds.l[[sp]][[version]][[adjust]][[duplORnot]]@predictions)) {
+                    print(layer)
+                    r.temp <- rds.l[[sp]][[version]][[adjust]][[duplORnot]]@predictions[[layer]]
+                    ex.predicted <- extract(r.temp, st_coordinates(lsd.temp))
 
-                    stop()
+                    if (inherits(try(
+                        ev <- sdm::evaluates(lsd.temp$presence, ex.predicted)
+                    ), "try-error")) {
+                        print("E3error")
+                        ev <- NA
+                    }
+                    rds.r[[sp]][[version]][[adjust]][[duplORnot]][[layer]] <- ev
                 }
+                gc()
             }
         }
     }
+    saveRDS(rds.r, paste0(path.wd.prep, sp, ".rds"))
 }
 
 stop()
