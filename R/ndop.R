@@ -283,7 +283,8 @@ for (druh in druhy) {
   df.temp <- data.frame(
     "species" = druh,
     "p" = nrow(pres), "pu" = nrow(pres.unique),
-    "tgob" = nrow(tgob), "tgobu" = nrow(tgob.unique)
+    "tgob" = nrow(tgob), "tgobu" = nrow(tgob.unique),
+    "authors" = length(pres.au)
   )
   if (first) {
     first <- FALSE
@@ -307,7 +308,7 @@ for (druh in druhy) {
     ) +
     ggtitle(
       label = (druh),
-      subtitle = paste0("TGOB (same species observers occs per pixel) | ", nrow(pres.unique), " / ", nrow(tgob.unique))
+      subtitle = paste0("TGOB (same species observers occs per pixel) | p:", df.temp$pu, " / bg:", df.temp$tgobu, " / a:", df.temp$authors)
     )
 
   png(paste0(path.wd.prep, "tgob/tgob-", str_replace_all(druh, "[\\/\\:]", "_"), ".png"), width = 1200, height = 700)
