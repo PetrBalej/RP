@@ -47,6 +47,12 @@ vifstep2 <- stack(paste0(path.wd, "dataPrep/observerSkill/vifstep2.grd")) # .rds
 pcamap6 <- vifstep2 # chci původní rastery, použít PCA je blbost, poslední osy postupně dávají nesmysly
 # souřadnice na SF - původní počty pro PPP
 ndop.ff.au.more.sf <- readRDS(paste0(path.wd.prep.ndop, "ndop.ff.au.more.sf.rds"))
+ndop.ff.au.more.sf.POLE <- readRDS(paste0(path.wd.prep.ndop, "ndop.ff.au.more.sf.POLE.rds"))
+ndop.ff.au.more.sf %<>% arrange(ID_NALEZ)
+ndop.ff.au.more.sf.POLE %<>% arrange(ID_NALEZ)
+# sum(ndop.ff.au.more.sf$ID_NALEZ == ndop.ff.au.more.sf.POLE$ID_NALEZ)
+ndop.ff.au.more.sf$POLE <- ndop.ff.au.more.sf.POLE$POLE
+
 
 # per pixel - unikátní hodnoty druhů na pixel a autora
 ndop.ff.au.more.sf.POLE.pp <- readRDS(paste0(path.wd.prep.ndop, "ndop.ff.au.more.sf.POLE.pp.rds"))
@@ -261,7 +267,9 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
     # - druh vůbec poznají,
     # - jsou ochotní ho zaznamenávat nebo
     # - vůbec nemapují v oblasti výskytu druhu
-    tgob <- ndop.ff.au.more.sf.POLE.pp.c %>% filter(AUTOR %in% pres.au)
+    tgob.puv <- ndop.ff.au.more.sf.POLE.pp.c %>% filter(AUTOR %in% pres.au)
+    tgob <- ndop.ff.au.more.sf %>% filter(AUTOR %in% pres.au)
+
     pres.unique <- pres %>%
         group_by(POLE) %>%
         slice_head(n = 1)
@@ -313,8 +321,8 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
     bf.skill.v1 <- smoothingRP(pcamap6.lsdClip[[1]], ndop.fs$adjusts, tgob, nback = ndop.fs$bg)
     bf.skill.v1$bg[["0"]] <- generateRPall(pcamap6.lsdClip[[1]], nback = ndop.fs$bg, random = TRUE)
     bg.col[["3"]] <- bf.skill.v1
-    bf.skill.v2 <- smoothingRP(pcamap6.lsdClip[[1]], ndop.fs$adjusts, tgob, nback = nrow(tgob))
-    bf.skill.v2$bg[["0"]] <- generateRPall(pcamap6.lsdClip[[1]], nback = nrow(tgob), random = TRUE)
+    bf.skill.v2 <- smoothingRP(pcamap6.lsdClip[[1]], ndop.fs$adjusts, tgob, nback = nrow(tgob.unique))
+    bf.skill.v2$bg[["0"]] <- generateRPall(pcamap6.lsdClip[[1]], nback = nrow(tgob.unique), random = TRUE)
     bg.col[["4"]] <- bf.skill.v2
     bf.skill.v3 <- smoothingRP(pcamap6.lsdClip[[1]], ndop.fs$adjusts, tgob, nback = nrow(pres.unique))
     bf.skill.v3$bg[["0"]] <- generateRPall(pcamap6.lsdClip[[1]], nback = nrow(pres.unique), random = TRUE)
@@ -324,8 +332,8 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
     bf.skill.v1s <- smoothingRP(pcamap6.skill[[1]], ndop.fs$adjusts, tgob, nback = ndop.fs$bg)
     bf.skill.v1s$bg[["0"]] <- generateRPall(pcamap6.skill[[1]], nback = ndop.fs$bg, random = TRUE)
     bg.col[["6"]] <- bf.skill.v1s
-    bf.skill.v2s <- smoothingRP(pcamap6.skill[[1]], ndop.fs$adjusts, tgob, nback = nrow(tgob))
-    bf.skill.v2s$bg[["0"]] <- generateRPall(pcamap6.skill[[1]], nback = nrow(tgob), random = TRUE)
+    bf.skill.v2s <- smoothingRP(pcamap6.skill[[1]], ndop.fs$adjusts, tgob, nback = nrow(tgob.unique))
+    bf.skill.v2s$bg[["0"]] <- generateRPall(pcamap6.skill[[1]], nback = nrow(tgob.unique), random = TRUE)
     bg.col[["7"]] <- bf.skill.v2s
     bf.skill.v3s <- smoothingRP(pcamap6.skill[[1]], ndop.fs$adjusts, tgob, nback = nrow(pres.unique))
     bf.skill.v3s$bg[["0"]] <- generateRPall(pcamap6.skill[[1]], nback = nrow(pres.unique), random = TRUE)
