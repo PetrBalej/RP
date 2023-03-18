@@ -85,7 +85,7 @@ vn <- versionNames()
 vf <- list("1" = 1:8, "0" = 9)
 
 ndop.fs <- list(
-    "adjusts" = c(0.01, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5),
+    "adjusts" = c(0.1, 0.5, 1, 2, 3, 4),
     "tuneArgs" = list(fc = c("L", "LQ"), rm = c(1, 2, 3, 5, 10)),
     "bg" = 5000, "speciesPerGroup" = 9, "speciesOccMin" = 30,
     "speciesPart" = cmd_arg, "version" = "v1",
@@ -205,8 +205,14 @@ smoothingRP <- function(raster.template, adjusts, occs.sf, nback = 5000) {
     d.lon <- distHaversine(c(prague[1], prague[2] - ppp.deg.distance[2]), c(prague[1], prague[2]))
     d.lat <- distHaversine(c(prague[1] - ppp.deg.distance[1], prague[2]), c(prague[1], prague[2]))
     # 0.001 a 0.01 jsou 100% korelované
+    
+    # spíše do nastavení?
+    sq2rad <-  c((1 / 6) / 4, 0.1 / 4)
+    adjusts.df <- as.data.frame(cbind("adj_i"= adjusts,"x" = sq2rad[1] * adjusts, "y" = sq2rad[2] * adjusts))
+    
     for (adj in adjusts) {
-        raster_stack.bias <- resample(raster(density.ppp(res.ndop.coords.ppp, sigma = bw.scott(res.ndop.coords.ppp), adjust = adj)), raster.template, method = "bilinear")
+        fa <-  as.vector(unlist(adjusts.df %>% filter(adj_i == adj) %>% dplyr::select(x,y)))
+        raster_stack.bias <- resample(raster(density.ppp(res.ndop.coords.ppp, sigma = fa)), raster.template, method = "bilinear")
         crs(raster_stack.bias) <- rcrs
         raster_stack.bias <- mask(crop(raster_stack.bias, extent(raster.template)), raster.template)
         raster_stack.bias <- setMinMax(raster_stack.bias)
@@ -216,7 +222,7 @@ smoothingRP <- function(raster.template, adjusts, occs.sf, nback = 5000) {
         r.max <- maxValue(raster_stack.bias)
         raster_stack.bias <- ((raster_stack.bias - r.min) / (r.max - r.min))
         raster_stack.bias <- setMinMax(raster_stack.bias)
-        bg[[as.character(adj * 100)]] <- generateRPall(raster_stack.bias, nback)
+        bg[[as.character(adj)]] <- generateRPall(raster_stack.bias, nback)
     }
 
     return(list(
