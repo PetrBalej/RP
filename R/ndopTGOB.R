@@ -150,11 +150,25 @@ for (nth in 1:groups) {
     }
 }
 
-generateRPall <- function(raster_stack.bias, nback = 5000, random = FALSE) {
+# vyřezané testovací LSD z presencí NDOP-u
+ex.temp <- extract(pcamap6.lsdClip[[1]], st_coordinates(ndop.ff.au.more.sf))
+ndop.ff.au.more.sf.extract <- ndop.ff.au.more.sf %>% filter(ID_NALEZ %in% ndop.ff.au.more.sf$ID_NALEZ[!is.na(ex.temp)])
+
+generateRPall <- function(RasterLayer_OR_sf_POINT, nback = 5000, random = FALSE) {
     # https://github.com/danlwarren/ENMTools/blob/004a4a1e182127900a5f62bc015770479bcd0415/R/check.bg.R#L138-L144
     # raster::sampleRandom ani sample(.., replace=FALSE) nejsou vhodné/nefungují pro menší N (clipnuté rastery skillem)
-    background.points <- as.data.frame(rasterToPoints(raster_stack.bias))
     out <- list()
+    if (is(RasterLayer_OR_sf_POINT, "RasterLayer")) {
+        background.points <- as.data.frame(rasterToPoints(RasterLayer_OR_sf_POINT))
+    } else if (is(RasterLayer_OR_sf_POINT, "sf") && st_geometry_type(RasterLayer_OR_sf_POINT, by_geometry = FALSE) == "POINT" && random == TRUE) {
+        background.points <- st_coordinates(RasterLayer_OR_sf_POINT)
+        colnames(background.points) <- c("x", "y")
+    } else {
+        print("Vstup generateRPall musí být RasterLayer nebo sf-POINT!")
+        print("sf-POINT pouze s random=TRUE")
+        return(out)
+    }
+
     if (random == FALSE) {
         # a1)
         inds <- sample(1:nrow(background.points),
@@ -205,13 +219,13 @@ smoothingRP <- function(raster.template, adjusts, occs.sf, nback = 5000) {
     d.lon <- distHaversine(c(prague[1], prague[2] - ppp.deg.distance[2]), c(prague[1], prague[2]))
     d.lat <- distHaversine(c(prague[1] - ppp.deg.distance[1], prague[2]), c(prague[1], prague[2]))
     # 0.001 a 0.01 jsou 100% korelované
-    
+
     # spíše do nastavení?
-    sq2rad <-  c((1 / 6) / 4, 0.1 / 4)
-    adjusts.df <- as.data.frame(cbind("adj_i"= adjusts,"x" = sq2rad[1] * adjusts, "y" = sq2rad[2] * adjusts))
-    
+    sq2rad <- c((1 / 6) / 4, 0.1 / 4)
+    adjusts.df <- as.data.frame(cbind("adj_i" = adjusts, "x" = sq2rad[1] * adjusts, "y" = sq2rad[2] * adjusts))
+
     for (adj in adjusts) {
-        fa <-  as.vector(unlist(adjusts.df %>% filter(adj_i == adj) %>% dplyr::select(x,y)))
+        fa <- as.vector(unlist(adjusts.df %>% filter(adj_i == adj) %>% dplyr::select(x, y)))
         raster_stack.bias <- resample(raster(density.ppp(res.ndop.coords.ppp, sigma = fa)), raster.template, method = "bilinear")
         crs(raster_stack.bias) <- rcrs
         raster_stack.bias <- mask(crop(raster_stack.bias, extent(raster.template)), raster.template)
@@ -275,6 +289,8 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
     # - vůbec nemapují v oblasti výskytu druhu
     tgob.puv <- ndop.ff.au.more.sf.POLE.pp.c %>% filter(AUTOR %in% pres.au)
     tgob <- ndop.ff.au.more.sf %>% filter(AUTOR %in% pres.au)
+
+    tgob.extract <- ndop.ff.au.more.sf.extract %>% filter(AUTOR %in% pres.au)
 
     pres.unique <- pres %>%
         group_by(POLE) %>%
@@ -354,6 +370,29 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
     bf.trad.u <- list()
     bf.trad.u$bg[["x"]][["uniq"]] <- tgob.unique$geometry
     bg.col[["10"]] <- bf.trad.u
+
+    ############ 11+12+13) tgob random subselekce ze všech presencí
+    bf.classic.v1 <- list()
+    bf.classic.v1$bg[["x"]] <- generateRPall(ndop.ff.au.more.sf.extract, nback = ndop.fs$bg, random = TRUE)
+    bg.col[["11"]] <- bf.classic.v1
+    bf.classic.v2 <- list()
+    bf.classic.v2$bg[["x"]] <- generateRPall(ndop.ff.au.more.sf.extract, nback = nrow(tgob.unique), random = TRUE)
+    bg.col[["12"]] <- bf.classic.v2
+    bf.classic.v3 <- list()
+    bf.classic.v3$bg[["x"]] <- generateRPall(ndop.ff.au.more.sf.extract, nback = nrow(pres.unique), random = TRUE)
+    bg.col[["13"]] <- bf.classic.v3
+
+    ############ 14+15+16) tgob random subselekce ze všech skill presencí
+    bf.classic.v1b <- list()
+    bf.classic.v1b$bg[["x"]] <- generateRPall(tgob.extract, nback = ndop.fs$bg, random = TRUE)
+    bg.col[["14"]] <- bf.classic.v1b
+    bf.classic.v2b <- list()
+    bf.classic.v2b$bg[["x"]] <- generateRPall(tgob.extract, nback = nrow(tgob.unique), random = TRUE)
+    bg.col[["15"]] <- bf.classic.v2b
+    bf.classic.v3b <- list()
+    bf.classic.v3b$bg[["x"]] <- generateRPall(tgob.extract, nback = nrow(pres.unique), random = TRUE)
+    bg.col[["16"]] <- bf.classic.v3b
+
     gc()
     # run vsech variant BG s ENMeval
     for (v1 in names(bg.col)) {
