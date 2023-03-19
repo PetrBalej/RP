@@ -88,6 +88,8 @@ ndop.fs <- list(
     "adjusts" = c(0.1, 0.5, 1, 2, 3, 4),
     "tuneArgs" = list(fc = c("L", "LQ"), rm = c(1, 2, 3, 5, 10)),
     "bg" = 5000, "speciesPerGroup" = 9, "speciesOccMin" = 30,
+    "sq2rad" = c((1 / 6) / 4, 0.1 / 4), # kvadráty KFME 2rad, xy velikost ve stupních
+    "sq2radDist" = c(1:5),
     "speciesPart" = cmd_arg, "version" = "v1",
     "versionNames" = vn, "versionSmooting" = vf
 )
@@ -269,6 +271,11 @@ tgob.trad <- ndop.ff.au.more.sf.POLE.pp.c %>%
     group_by(POLE) %>%
     slice_head(n = 1)
 
+# "tradiční" TGOB per pole a druh - pro thin
+tgob.trad.sp <- ndop.ff.au.more.sf.POLE.pp.c %>%
+    group_by(POLE, DRUH) %>%
+    slice_head(n = 1)
+
 sp.group <- ndop.sp.selected.regrouped %>% filter(nthGroup == ndop.fs$speciesPart)
 
 first <- TRUE
@@ -393,6 +400,37 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
     bf.classic.v3b$bg[["x"]] <- generateRPall(tgob.extract, nback = nrow(pres.unique), random = TRUE)
     bg.col[["16"]] <- bf.classic.v3b
 
+    ############ 17+18+19) thinning presencí + random bg
+    sq2rad.dist <- ndop.fs$sq2rad[1] + 0.00001 # delší strana kvadrátu, přičtení drobné vzdálenosti
+    sq2rad.dist.range <- sq2rad.dist * ndop.fs$sq2radDist
+
+    thinned.versions <- as.character(17:19)
+    tgob.trad.tm <- tgob.trad.sp %>% filter(DRUH == druh)
+    tgob.trad.tm.df <- as.data.frame(st_coordinates(tgob.trad.tm))
+    colnames(tgob.trad.tm.df) <- c("x", "y")
+    occs.thinned.kept <- list()
+    thinning.v1 <- list()
+    thinning.v2 <- list()
+    thinning.v3 <- list()
+    thinning.v1.temp <- generateRPall(pcamap6.skill[[1]], nback = ndop.fs$bg, random = TRUE)
+    thinning.v2.temp <- generateRPall(pcamap6.skill[[1]], nback = nrow(tgob.unique), random = TRUE)
+    # thinning.v3 má variabilní počet presencí a tedy i počtu BG podle úrpovně thinu, počítá se až individuálně v cyklu
+
+    for (thinDist in sq2rad.dist.range) {
+        occs.thinned <- ecospat.occ.desaggregation(xy = tgob.trad.tm.df, min.dist = thinDist, by = NULL)
+        thinDist <- as.character(thinDist)
+        occs.thinned.kept[[thinDist]] <- occs.thinned %>% st_as_sf(coords = c("x", "y"), crs = 4326)
+
+        # backgroundy jsou reálně totožné, jde jen o zásobník pro různý počet thinovaných presencí
+        # tentokrát ale významově v2 není hodnota sigma pro background, ale min. vzdálenost pro thinning presenčního datasetu!!!
+        thinning.v1$bg[[thinDist]] <- thinning.v1.temp
+        thinning.v2$bg[[thinDist]] <- thinning.v2.temp
+        thinning.v3$bg[[thinDist]] <- generateRPall(pcamap6.skill[[1]], nback = nrow(occs.thinned.kept[[thinDist]]), random = TRUE)
+    }
+    bg.col[["17"]] <- thinning.v1
+    bg.col[["18"]] <- thinning.v2
+    bg.col[["19"]] <- thinning.v3
+
     gc()
     # run vsech variant BG s ENMeval
     for (v1 in names(bg.col)) {
@@ -401,8 +439,17 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
                 bg.temp <- as.data.frame(st_coordinates(bg.col[[v1]]$bg[[v2]][[v3]]))
                 names(bg.temp) <- ll
 
+                if (v1 %in% thinned.versions) {
+                    print("měním presenční dataset pro thinnovací verze")
+                    df.temp.final <- as.data.frame(st_coordinates(occs.thinned.kept[[v2]]))
+                    names(df.temp.final) <- ll
+                } else {
+                    df.temp.final <- df.temp
+                }
+
                 e.mx.all[[druh]][[v1]][[v2]][[v3]] <- ENMevaluate(
-                    occs = df.temp, envs = pcamap6,
+                    occs = df.temp.final,
+                    envs = pcamap6,
                     bg.coords = bg.temp,
                     algorithm = "maxnet", partitions = "randomkfold",
                     partition.settings = list("kfolds" = 3),
