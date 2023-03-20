@@ -114,10 +114,6 @@ for (fpath in rds_list) {
                     # max(se+sp)
                     ev.temp <- merge(ev.temp, ev@threshold_based[2, ])
                     ev.temp[["tune.args"]] <- layer
-                    ev.temp[["species"]] <- sp
-                    ev.temp[["version"]] <- version
-                    ev.temp[["adjust"]] <- adjust
-                    ev.temp[["duplORnot"]] <- duplORnot
                     if (second) {
                         second <- FALSE
                         out.t.second <- ev.temp
@@ -125,6 +121,10 @@ for (fpath in rds_list) {
                         out.t.second %<>% add_row(ev.temp)
                     }
                 }
+                ev.temp[["species"]] <- sp
+                ev.temp[["version"]] <- version
+                ev.temp[["adjust"]] <- adjust
+                ev.temp[["duplORnot"]] <- duplORnot
 
                 temp.t <- rds.l[[sp]][[version]][[adjust]][[duplORnot]]@results %>% left_join(out.t.second, by = "tune.args")
 
