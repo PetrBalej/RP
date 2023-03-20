@@ -132,8 +132,10 @@ for (fpath in rds_list) {
                 temp.t$occs.n <- nrow(occs)
                 temp.t$occs.wkt <- st_as_text(st_combine(occs %>% st_as_sf(coords = c("longitude", "latitude"), crs = 4326)))
                 temp.t$bg.n <- nrow(rds.l[[sp]][[version]][[adjust]][[duplORnot]]@bg)
-
-                temp.t$p.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 1)) %>% st_cast("MULTIPOINT"))
+                # LSD
+                temp.t$p.n <- nrow(lsd.temp %>% filter(presence == 1))
+                temp.t$a.n <- nrow(lsd.temp %>% filter(presence == 0))
+                temp.t$p.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 1)))
                 temp.t$a.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 0)))
 
                 if (first) {
