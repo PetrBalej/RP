@@ -121,10 +121,10 @@ for (fpath in rds_list) {
                         out.t.second %<>% add_row(ev.temp)
                     }
                 }
-                ev.temp[["species"]] <- sp
-                ev.temp[["version"]] <- version
-                ev.temp[["adjust"]] <- adjust
-                ev.temp[["duplORnot"]] <- duplORnot
+                rds.l[[sp]][[version]][[adjust]][[duplORnot]]@results[["species"]] <- sp
+                rds.l[[sp]][[version]][[adjust]][[duplORnot]]@results[["version"]] <- version
+                rds.l[[sp]][[version]][[adjust]][[duplORnot]]@results[["adjust"]] <- adjust
+                rds.l[[sp]][[version]][[adjust]][[duplORnot]]@results[["duplORnot"]] <- duplORnot
 
                 temp.t <- rds.l[[sp]][[version]][[adjust]][[duplORnot]]@results %>% left_join(out.t.second, by = "tune.args")
 
