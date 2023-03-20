@@ -87,7 +87,7 @@ vf <- list("1" = 1:8, "0" = 9)
 ndop.fs <- list(
     "adjusts" = c(0.1, 0.5, 1, 2, 3, 4),
     "tuneArgs" = list(fc = c("L", "LQ"), rm = c(1, 2, 3, 5, 10)),
-    "bg" = 5000, "speciesPerGroup" = 9, "speciesOccMin" = 30,
+    "bg" = 5000, "speciesPerGroup" = 7, "speciesOccMin" = 30,
     "sq2rad" = c((1 / 6) / 4, 0.1 / 4), # kvadráty KFME 2rad, xy velikost ve stupních
     "sq2radDist" = c(1:5),
     "speciesPart" = cmd_arg, "version" = "v1",
@@ -163,7 +163,7 @@ generateRPall <- function(RasterLayer_OR_sf_POINT, nback = 5000, random = FALSE)
     if (is(RasterLayer_OR_sf_POINT, "RasterLayer")) {
         background.points <- as.data.frame(rasterToPoints(RasterLayer_OR_sf_POINT))
     } else if (is(RasterLayer_OR_sf_POINT, "sf") && st_geometry_type(RasterLayer_OR_sf_POINT, by_geometry = FALSE) == "POINT" && random == TRUE) {
-        background.points <- st_coordinates(RasterLayer_OR_sf_POINT)
+        background.points <- as.data.frame(st_coordinates(RasterLayer_OR_sf_POINT))
         colnames(background.points) <- c("x", "y")
     } else {
         print("Vstup generateRPall musí být RasterLayer nebo sf-POINT!")
