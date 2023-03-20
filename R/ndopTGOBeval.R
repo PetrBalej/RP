@@ -1,3 +1,15 @@
+cmd_arg <- commandArgs(trailingOnly = TRUE)
+if (is.na(cmd_arg[1])) {
+    print("*********************************************************************************************************************")
+    print("nezadán parametr pro část druhů")
+    print("*********************************************************************************************************************")
+    cmd_arg <- 1
+} else {
+    cmd_arg <- cmd_arg[1]
+}
+
+print(cmd_arg)
+
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
@@ -57,6 +69,14 @@ rds_list <-
         ignore.case = TRUE,
         full.names = TRUE
     )
+
+# do nastavení!!!
+tmp.group <- 3
+tmp.perGroup <- ceiling(length(rds_list) / tmp.group)
+tmp.group.parts <- split(rds_list, ceiling(seq_along(rds_list) / tmp.perGroup))
+# omezím původní seznam
+rds_list <- tmp.group.parts[[cmd_arg]]
+print(rds_list)
 
 out.t <- list()
 rds.r <- list()
@@ -141,7 +161,12 @@ for (fpath in rds_list) {
                 if (first) {
                     first <- FALSE
                     out.t <- temp.t
-                    write.table(temp.t, paste0(path.wd.prep, "out.t.csv"), sep = ",", row.names = FALSE, col.names = TRUE)
+                    col.names <- TRUE
+                    if (file.exists(paste0(path.wd.prep, "out.t.csv"))) {
+                        # pokud už paralelně v jiném procesu soubor vznikl, nevkládám znovu názvy sloupců
+                        col.names <- FALSE
+                    }
+                    write.table(temp.t, paste0(path.wd.prep, "out.t.csv"), sep = ",", row.names = FALSE, col.names = col.names, append = TRUE)
                 } else {
                     out.t %<>% add_row(temp.t)
                     write.table(temp.t, paste0(path.wd.prep, "out.t.csv"), sep = ",", row.names = FALSE, col.names = FALSE, append = TRUE)
@@ -156,8 +181,8 @@ for (fpath in rds_list) {
 
     # ukládat per species?
 }
-saveRDS(out.t, paste0(path.wd.prep, "out.t.rds"))
-saveRDS(rds.r, paste0(path.wd.prep, "rds.r.rds"))
+saveRDS(out.t, paste0(path.wd.prep, "out.t.", cmd_arg, ".rds"))
+saveRDS(rds.r, paste0(path.wd.prep, "rds.r.", cmd_arg, ".rds"))
 
 
 # stop()
