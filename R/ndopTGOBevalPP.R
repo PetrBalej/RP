@@ -40,7 +40,7 @@ lsd.pa.centroids <- readRDS(paste0(path.wd, "dataPrep/lsd/lsd.pa.centroids.rds")
 # settings
 ############
 
-ndop.fs <- list("version" = "v1")
+ndop.fs <- list("months" = c(4:6), "years" = c(2019:2022), "precision" = 1000, "version" = "v1")
 
 ############
 # execution
@@ -88,13 +88,14 @@ rds.out <- readRDS(paste0(path.wd.prep, "all_rds.out.rds"))
 rds.r <- readRDS(paste0(path.wd.prep, "all_rds.r.rds"))
 rds.out %<>% filter(!is.na(AUC)) # odstranit modely kde nešla provést LSD evaluace
 
-
+topXpc <- 0.01
+topXrows <- 3
 # výběr nejlepších X procent
 rds.out.best <- rds.out %>%
     group_by(species) %>%
     mutate(AUC.max = max(AUC)) %>%
     ungroup() %>%
-    filter(AUC >= (AUC.max - 0.01))
+    filter(AUC >= (AUC.max - topXpc))
 
 
 # kolik bylo úspěšných modelů pro zvolený treshold
@@ -110,7 +111,7 @@ for (sp in unique(rds.out.best$species)) {
 
     sp.selected <- rds.out.best %>%
         filter(species == sp) %>%
-        slice_max(AUC, n = 10) %>%
+        slice_max(AUC, n = topXrows) %>%
         dplyr::select(species, AUC, tune.args, version, adjust, duplORnot, AUC.max, occs.wkt, p.wkt, a.wkt)
     print(sp.selected)
     r.stack.list <- list()
@@ -132,7 +133,8 @@ for (sp in unique(rds.out.best$species)) {
 
     ggpl <- ggplot() +
         geom_raster(data = as.data.frame(r.median, xy = TRUE) %>% na.omit(), aes(x = x, y = y, fill = layer)) +
-        scale_fill_gradient(low = "white", high = "DodgerBlue") +
+        scale_fill_gradient2(low = "white", mid = "#DBE9FA", high = "#4682B4", midpoint = 0.5) +
+        labs(fill = "hab. suitab. \n(cloglog)", caption = paste0("occs source: AOPK NDOP (years: ", min(ndop.fs$years), "-", max(ndop.fs$years), "; months: ", min(ndop.fs$months), "-", max(ndop.fs$months), ") | author: Petr Balej | WGS84 | grid: KFME (SitMap_2Rad) | generated: ", Sys.Date())) +
         theme_light() +
         geom_sf(data = pu, pch = 1, size = 2, color = "#34282C") +
         geom_sf(data = pp, pch = 20, size = 1.5, color = "green") +
@@ -143,10 +145,10 @@ for (sp in unique(rds.out.best$species)) {
         ) +
         ggtitle(
             label = sp,
-            subtitle = paste0("AUC=", sp.selected.row$AUC.max)
+            subtitle = paste0("AUC=", sp.selected.row$AUC.max, " | topXpc=", topXpc, "; topXrows=", topXrows)
         )
 
-    png(paste0(path.wd.prep, "preds/", sp, ".png"), width = 1400, height = 800)
+    png(paste0(path.wd.prep, "preds/", sp, "_topXpc-", topXpc, "_topXrows-", topXrows, ".png"), width = 1400, height = 800)
     print(ggpl)
     dev.off()
 }
