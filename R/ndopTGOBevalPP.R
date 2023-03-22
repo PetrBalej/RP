@@ -46,7 +46,8 @@ ndop.fs <- list("months" = c(4:6), "years" = c(2019:2022), "precision" = 1000, "
 ############
 
 vn <- versionNames()
-
+vnDf <- versionNamesDf()
+write.csv(vnDf, paste0(path.wd.prep, "vnDf.csv"), row.names = FALSE)
 # #
 # # spojení částí
 # #
@@ -166,40 +167,68 @@ for (v in vs.all.versions) {
     }
 }
 
-# pivot_wider
+# připojím druhotné skupiny k verzím
+vs.diff %<>% left_join(vnDf, by = c("version" = "id")) %>% arrange(group)
+
+# pivot_wider?
 vs.all.compare <- vs.diff %>%
     ungroup() %>%
-    group_by(version, duplORnot)
+    group_by(species, version, duplORnot)
 # %>% summarise(AUC.diff.median = median(AUC.diff))
 
 vs.all.compare.order <- vs.all.compare %>%
-    summarise(AUC.diff.median = median(AUC.diff)) %>%
     ungroup() %>%
-    ungroup() %>%
-    arrange(AUC.diff.median)
+    group_by(version, duplORnot) %>%
+    summarise(AUC.diff.median = median(AUC.diff), group = first(group), short = first(short)) %>%
+    dplyr::select(AUC.diff.median, version, duplORnot, group, short) %>%
+    arrange(AUC.diff.median, duplORnot)
+
+write.csv(vs.all.compare.order, paste0(path.wd.prep, "vs.all.compare.order.csv"), row.names = FALSE)
 
 
-group_ordered <- with(
-    vs.all.compare, # Order boxes by median
-    reorder(
-        version,
-        AUC.diff,
-        median
-    )
-)
-data_ordered <- vs.all.compare # Create data with reordered group levels
-data_ordered$group <- factor(data_ordered$version,
-    levels = levels(group_ordered)
-)
+# # # # # # udělat místo toho per species rozdíly dupl/uniq a ty dát do boxplotů?
 
-# # # # # # udělat místo toho per species rozdíly dupl/uniq a ty dát do boxplotů
+# uniq vs. dupl - jsou rozdíly
 ggplot(vs.all.compare, aes(x = version, y = AUC.diff, fill = duplORnot)) +
     geom_boxplot()
+ggsave(paste0(path.wd.prep, "duplORnot.png"))
 
 
+### facety?
+# ggplot(vs.all.compare, aes(x = version, y = AUC.diff, fill = duplORnot)) + geom_boxplot() + facet_wrap(~group)
+# ggplot(vs.all.compare, aes(x = short, y = AUC.diff, fill = group)) +
+#     geom_boxplot() +
+#     facet_wrap(~duplORnot) +
+#     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+
+# vnucení řezení podle mediánu
+group_ordered <- with(droplevels(vs.all.compare.order %>% filter(duplORnot == "dupl") %>% na.omit()), reorder(short, AUC.diff.median))
+vs.all.compare.reorder <- droplevels(vs.all.compare %>% filter(duplORnot == "dupl") %>% na.omit())
+vs.all.compare.reorder$short <- factor(vs.all.compare.reorder$short, levels = levels(group_ordered))
+
+# boxploty s verzemi
+ggplot(vs.all.compare.reorder, aes(x = short, y = AUC.diff, fill = group)) +
+    geom_boxplot() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+    scale_fill_manual(values = c("lawngreen", "limegreen", "darkgreen", "salmon", "red", "darkred"))
+ggsave(paste0(path.wd.prep, "vs.all.compare.reorder.png"))
+
+# odstraním outliery
+ggplot(vs.all.compare.reorder, aes(x = short, y = AUC.diff, fill = group)) +
+    geom_boxplot(outlier.shape = NA) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+    scale_fill_manual(values = c("lawngreen", "limegreen", "darkgreen", "salmon", "red", "darkred")) +
+    # scale_y_continuous(limits = c(-0.1, 0.2))
+    # coord_cartesian(ylim = quantile(vs.all.compare.reorder$AUC.diff, c(0.1, 0.9)))
+    coord_cartesian(ylim = c(-0.1, 0.17))
+ggsave(paste0(path.wd.prep, "vs.all.compare.reorder.outliers.png"))
+
+# porovnání napříč druhy??? předchozí hrafy jsou hrubé a nezohledňují kterým druhům korekce pomohla, mohlas e u jiných druhů projevit jinak...
 
 stop()
-rds.r <- readRDS(paste0(path.wd.prep, "all_rds.r.rds"))
+### # načte 16GB komprimovaných rasterů s predikcemi (zabírá téměř 30GB RAM!!!)
+# rds.r <- readRDS(paste0(path.wd.prep, "all_rds.r.rds"))
 
 topXpc <- 0.01
 topXrows <- 1 # vybírám už jen nejlepší predikci pro každou verzi a duplikaci, neberu všechny...
