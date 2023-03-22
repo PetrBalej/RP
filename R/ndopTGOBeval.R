@@ -65,7 +65,7 @@ lsd.pa.centroids.syn.species <- unlist(unique(lsd.pa.centroids.syn$species))
 rds_list <-
     list.files(
         path.temp.res,
-        pattern = paste0("^skill_"),
+        pattern = paste0("^skill_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
         ignore.case = TRUE,
         full.names = TRUE
     )
@@ -86,7 +86,7 @@ for (fpath in rds_list) {
     rds.l <- list()
     # dočasně rozdělené do dvou částí, nutno spojit:
     rds.l1 <- readRDS(fpath)
-    rds.l2 <- readRDS(str_replace(fpath, "skill", "skillb"))
+    rds.l2 <- readRDS(str_replace(fpath, "skill", "skillb")) # !!! zakomentovat
 
     sp <- names(rds.l1)
     if (length(sp) > 1) {
@@ -94,6 +94,7 @@ for (fpath in rds_list) {
         stop()
     }
     rds.l[[sp]] <- append(rds.l1[[sp]], rds.l2[[sp]])
+    # !!! rds.l[[sp]] <- rds.l1[[sp]]
 
     # nezávislá PA data z LSD pro daný druh
     lsd.temp <- lsd.pa.centroids.syn %>% filter(species == sp)
@@ -181,8 +182,8 @@ for (fpath in rds_list) {
 
     # ukládat per species?
 }
-saveRDS(out.t, paste0(path.wd.prep, "out.t.", cmd_arg, ".rds"))
-saveRDS(rds.r, paste0(path.wd.prep, "rds.r.", cmd_arg, ".rds"))
+saveRDS(out.t, paste0(path.wd.prep, "out.t.c", as.character(cmd_arg), ".rds")) # !!! nové názvy, nepřepsat původní
+saveRDS(rds.r, paste0(path.wd.prep, "rds.r.c", as.character(cmd_arg), ".rds")) # !!!
 
 
 # stop()
