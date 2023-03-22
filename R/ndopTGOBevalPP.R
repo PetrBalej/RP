@@ -1,4 +1,3 @@
-cmd_arg <- commandArgs(trailingOnly = TRUE)
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
@@ -46,6 +45,8 @@ ndop.fs <- list("months" = c(4:6), "years" = c(2019:2022), "precision" = 1000, "
 # execution
 ############
 
+vn <- versionNames()
+
 # #
 # # spojení částí
 # #
@@ -83,13 +84,125 @@ ndop.fs <- list("months" = c(4:6), "years" = c(2019:2022), "precision" = 1000, "
 
 
 
+# ## napárování 20-22 rasterů
+# rr.orig <- readRDS(paste0(path.wd.prep, "all_rds.r-copy.rds"))
+# rr.v2022 <- readRDS(paste0(path.wd.prep, "all_rds.rc.rds"))
+# rr.orig.names <- names(rr.orig)
+# for (sp in rr.orig.names) {
+#     print(sp)
+#     for (version in names(rr.v2022[[sp]])) {
+#         print(version)
+#         rr.orig[[sp]][[version]] <- rr.v2022[[sp]][[version]]
+#     }
+# }
+# # saveRDS(rr.orig, paste0(path.wd.prep, "all_rds.r.rds"))
+
+
+
 
 rds.out <- readRDS(paste0(path.wd.prep, "all_rds.out.rds"))
-rds.r <- readRDS(paste0(path.wd.prep, "all_rds.r.rds"))
 rds.out %<>% filter(!is.na(AUC)) # odstranit modely kde nešla provést LSD evaluace
 
+
+# porovnat 2 samostatné random null:
+rds.out.null.compare <- rds.out %>%
+    filter((version == 1 | version == 3) & adjust == 0) %>%
+    group_by(species, version, duplORnot) %>%
+    mutate(compareGroup = paste0(species, "-", version, "-", duplORnot)) %>%
+    ungroup() %>%
+    group_by(compareGroup) %>%
+    slice_max(AUC, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    group_by(species, duplORnot) %>%
+    mutate(Diff = AUC - lag(AUC)) %>%
+    na.omit()
+
+visDiff1 <- rds.out.null.compare %>%
+    filter(duplORnot == "dupl") %>%
+    dplyr::select(Diff)
+visDiff2 <- rds.out.null.compare %>%
+    filter(duplORnot == "uniq") %>%
+    dplyr::select(Diff)
+
+boxplot(list("dupl" = visDiff1$Diff, "uniq" = visDiff2$Diff))
+hist(abs(visDiff1$Diff))
+hist(abs(visDiff2$Diff))
+
+#
+# dif vůči random
+#
+
+# nulová bg random verze
+vs.null <- rds.out %>%
+    filter(version == 3 & adjust == 0) %>% # vybírám 3, ale mohl bych i 1, reálně musím udělat více replikací (změn backgroundu) a zprůměrovat je
+    group_by(species, duplORnot) %>%
+    slice_max(AUC, n = 1, with_ties = FALSE) # zde neřeším více modelů se stejně vysokým AUC
+
+
+# porovnání nej z jednotlivých základních verzí - neřeším adjusty ani šířku thinu!!!  (4176 / 2 / 116 = 18 verzí - mám ale 19 verzí - všechny nemají dupl/unique varianty - nemůžu dělit 2...)
+
+vs.all <- rds.out %>%
+    # filter(adjust != 0) %>% # ponechávám všechny interní random verze ("0") - neměl bych dělat porovnání s interními random verzemi?
+    group_by(species, version, duplORnot) %>%
+    slice_max(AUC, n = 1, with_ties = FALSE) # %>% # zde neřeším více modelů se stejně vysokým AUC
+# mutate(compareGroup = paste0(species, "-", version, "-", duplORnot))
+
+vs.all %<>% left_join(vs.null %>% dplyr::select(AUC), by = c("species", "duplORnot"), suffix = c("", ".null"))
+
+vs.all.versions <- unique(vs.all$version)
+
+first <- TRUE
+for (v in vs.all.versions) {
+    vs.all.temp <- vs.all %>%
+        ungroup() %>%
+        filter(version == v) %>%
+        mutate(AUC.diff = AUC - AUC.null)
+
+    if (first) {
+        first <- FALSE
+        vs.diff <- vs.all.temp
+    } else {
+        vs.diff %<>% add_row(vs.all.temp)
+    }
+}
+
+# pivot_wider
+vs.all.compare <- vs.diff %>%
+    ungroup() %>%
+    group_by(version, duplORnot)
+# %>% summarise(AUC.diff.median = median(AUC.diff))
+
+vs.all.compare.order <- vs.all.compare %>%
+    summarise(AUC.diff.median = median(AUC.diff)) %>%
+    ungroup() %>%
+    ungroup() %>%
+    arrange(AUC.diff.median)
+
+
+group_ordered <- with(
+    vs.all.compare, # Order boxes by median
+    reorder(
+        version,
+        AUC.diff,
+        median
+    )
+)
+data_ordered <- vs.all.compare # Create data with reordered group levels
+data_ordered$group <- factor(data_ordered$version,
+    levels = levels(group_ordered)
+)
+
+# # # # # # udělat místo toho per species rozdíly dupl/uniq a ty dát do boxplotů
+ggplot(vs.all.compare, aes(x = version, y = AUC.diff, fill = duplORnot)) +
+    geom_boxplot()
+
+
+
+stop()
+rds.r <- readRDS(paste0(path.wd.prep, "all_rds.r.rds"))
+
 topXpc <- 0.01
-topXrows <- 3
+topXrows <- 1 # vybírám už jen nejlepší predikci pro každou verzi a duplikaci, neberu všechny...
 # výběr nejlepších X procent
 
 #
@@ -97,35 +210,43 @@ topXrows <- 3
 #
 # nejlepší z nejlepších
 rds.out.best <- rds.out %>%
-    group_by(species) %>%
-    mutate(AUC.max = max(AUC)) %>%
+    group_by(species, version, duplORnot) %>%
+    slice_max(AUC, n = topXrows, with_ties = FALSE) %>%
     ungroup() %>%
-    filter(AUC >= (AUC.max - topXpc))
+    group_by(species) %>%
+    filter(AUC >= (max(AUC) - topXpc)) %>%
+    ungroup()
 
 # "null" - random 5000 a všechny presence (verze 1 adjust 0 nebo verze 3 adjust 0 )
 rds.out.null <- rds.out %>%
     filter(version == 1 & adjust == 0) %>%
-    group_by(species) %>%
-    mutate(AUC.max = max(AUC)) %>%
+    group_by(species, version, duplORnot) %>%
+    slice_max(AUC, n = topXrows, with_ties = FALSE) %>%
     ungroup() %>%
-    filter(AUC >= (AUC.max - topXpc))
+    group_by(species) %>%
+    filter(AUC >= (max(AUC) - topXpc)) %>%
+    ungroup()
 #
 ### # validace nad interním blokem z NDOP (auc.val.avg)
 #
 # nejlepší z nejlepších
 rds.out.best.ndop <- rds.out %>%
-    group_by(species) %>%
-    mutate(AUC.max = max(auc.val.avg)) %>%
+    group_by(species, version, duplORnot) %>%
+    slice_max(auc.val.avg, n = topXrows, with_ties = FALSE) %>%
     ungroup() %>%
-    filter(auc.val.avg >= (AUC.max - topXpc))
+    group_by(species) %>%
+    filter(auc.val.avg >= (max(auc.val.avg) - topXpc)) %>%
+    ungroup()
 
 # "null" - random 5000 a všechny presence (verze 1 adjust 0 nebo verze 3 adjust 0 )
 rds.out.null.ndop <- rds.out %>%
     filter(version == 1 & adjust == 0) %>%
-    group_by(species) %>%
-    mutate(AUC.max = max(auc.val.avg)) %>%
+    group_by(species, version, duplORnot) %>%
+    slice_max(auc.val.avg, n = topXrows, with_ties = FALSE) %>%
     ungroup() %>%
-    filter(auc.val.avg >= (AUC.max - topXpc))
+    group_by(species) %>%
+    filter(auc.val.avg >= (max(auc.val.avg) - topXpc)) %>%
+    ungroup()
 
 
 
@@ -145,25 +266,24 @@ for (sp in unique(rds.out.best$species)) {
     ### # LSD validace
     sp.selected <- rds.out.best %>%
         filter(species == sp) %>%
-        slice_max(AUC, n = topXrows) %>%
-        dplyr::select(species, AUC, auc.val.avg, tune.args, version, adjust, duplORnot, AUC.max, occs.wkt, p.wkt, a.wkt)
+        dplyr::select(species, AUC, auc.val.avg, tune.args, version, adjust, duplORnot, occs.wkt, p.wkt, a.wkt)
     print(sp.selected)
 
     sp.selected.null <- rds.out.null %>%
         filter(species == sp) %>%
-        dplyr::select(species, AUC, auc.val.avg, tune.args, version, adjust, duplORnot, AUC.max, occs.wkt, p.wkt, a.wkt)
+        dplyr::select(species, AUC, auc.val.avg, tune.args, version, adjust, duplORnot, occs.wkt, p.wkt, a.wkt)
+    print(sp.selected.null)
 
     ### # NDOP validace
     sp.selected.ndop <- rds.out.best.ndop %>%
         filter(species == sp) %>%
-        slice_max(AUC, n = topXrows) %>%
-        dplyr::select(species, AUC, auc.val.avg, tune.args, version, adjust, duplORnot, AUC.max, occs.wkt, p.wkt, a.wkt)
+        dplyr::select(species, AUC, auc.val.avg, tune.args, version, adjust, duplORnot, occs.wkt, p.wkt, a.wkt)
     print(sp.selected)
 
     sp.selected.null.ndop <- rds.out.null.ndop %>%
         filter(species == sp) %>%
-        dplyr::select(species, AUC, auc.val.avg, tune.args, version, adjust, duplORnot, AUC.max, occs.wkt, p.wkt, a.wkt)
-
+        dplyr::select(species, AUC, auc.val.avg, tune.args, version, adjust, duplORnot, occs.wkt, p.wkt, a.wkt)
+    print(sp.selected.null.ndop)
     #
     ### # validace nad independent LSD (AUC)
     #
@@ -247,7 +367,7 @@ for (sp in unique(rds.out.best$species)) {
             plot.title = element_text(hjust = 0.5, size = 10)
         ) +
         ggtitle(
-            label = paste0("AUC(LSD)=", round(sp.selected.row$AUC.max, digits = 2), " | topXpc=", topXpc, "; topXrows=", topXrows)
+            label = paste0("AUC(NDOP)=", round(max(sp.selected$auc.val.avg), digits = 2), " | AUC(LSD)=", round(max(sp.selected$AUC), digits = 2))
         )
 
 
@@ -266,7 +386,7 @@ for (sp in unique(rds.out.best$species)) {
             plot.title = element_text(hjust = 0.5, size = 10)
         ) +
         ggtitle(
-            label = paste0("AUC(LSD)=", round(sp.selected.row.null$AUC.max, digits = 2), " | topXpc=", topXpc, "; topXrows=", topXrows)
+            label = paste0("AUC(NDOP)=", round(max(sp.selected.null$auc.val.avg), digits = 2), " | AUC(LSD)=", round(max(sp.selected.null$AUC), digits = 2))
         )
 
     #
@@ -287,7 +407,7 @@ for (sp in unique(rds.out.best$species)) {
             plot.title = element_text(hjust = 0.5, size = 10)
         ) +
         ggtitle(
-            label = paste0("AUC(NDOP)=", round(sp.selected.row.ndop$AUC.max, digits = 2), " | topXpc=", topXpc, "; topXrows=", topXrows)
+            label = paste0("AUC(NDOP)=", round(max(sp.selected.ndop$auc.val.avg), digits = 2), " | AUC(LSD)=", round(max(sp.selected.ndop$AUC), digits = 2))
         )
 
     ggpl4 <- ggplot() +
@@ -305,7 +425,7 @@ for (sp in unique(rds.out.best$species)) {
             plot.title = element_text(hjust = 0.5, size = 10)
         ) +
         ggtitle(
-            label = paste0("AUC(NDOP)=", round(sp.selected.row.null.ndop$AUC.max, digits = 2), " | topXpc=", topXpc, "; topXrows=", topXrows)
+            label = paste0("AUC(NDOP)=", round(max(sp.selected.null.ndop$auc.val.avg), digits = 2), " | AUC(LSD)=", round(max(sp.selected.null.ndop$AUC), digits = 2))
         )
 
 
@@ -317,10 +437,10 @@ for (sp in unique(rds.out.best$species)) {
             ggpl2,
             ggpl1,
             nrow = 2, ncol = 2,
-            top = textGrob(paste0(sp, "\n no bias correction                                                                                   best bias correction"), gp = gpar(fontsize = 20, fontface = "bold")),
+            top = textGrob(paste0(sp, "\n no bias correction                                                                                             best bias correction"), gp = gpar(fontsize = 20, fontface = "bold")),
             left = textGrob("test indep. (AUC LSD selection)                  test dep. (AUC NDOP selection)", gp = gpar(fontsize = 20, fontface = "bold"), rot = 90),
             bottom = textGrob(
-                paste0("NDOP: černá | LSD: zelená=presence, červená=absence) | occs source: AOPK NDOP (years: ", min(ndop.fs$years), "-", max(ndop.fs$years), "; months: ", min(ndop.fs$months), "-", max(ndop.fs$months), ") | author: Petr Balej | WGS84 | grid: KFME (SitMap_2Rad) | generated: ", Sys.Date())
+                paste0("NDOP: černá | LSD: zelená=presence, červená=absence) | topXpc=", topXpc, "; topXrows=", topXrows, "\n", paste(unlist(vn[which(names(vn) %in% unique(sp.selected$version))]), collapse = " | "), "\n occs source: AOPK NDOP (years: ", min(ndop.fs$years), "-", max(ndop.fs$years), "; months: ", min(ndop.fs$months), "-", max(ndop.fs$months), ") | author: Petr Balej | WGS84 | grid: KFME (SitMap_2Rad) | generated: ", Sys.Date())
             )
         )
     )
