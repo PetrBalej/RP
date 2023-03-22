@@ -37,10 +37,10 @@ versionNames <- function() {
 
 versionNamesDf <- function() {
     vn <- versionNames()
-    df.colnames <- c("id", "bg_source", "bg_n", "bg_sampling_method", "bg_region", "presence_thinning", "description", "group")
+    df.colnames <- c("id", "short", "bg_source", "bg_n", "bg_sampling_method", "bg_region", "presence_thinning", "description", "group")
     first <- TRUE
     for (id in names(vn)) {
-        df.temp <- as_tibble(t(c(id, strsplit(vn[[id]][["short"]], "_", fixed = TRUE)[[1]], vn[[id]][["desc"]], vn[[id]][["group"]])))
+        df.temp <- as_tibble(t(c(id, vn[[id]][["short"]], strsplit(vn[[id]][["short"]], "_", fixed = TRUE)[[1]], vn[[id]][["desc"]], vn[[id]][["group"]])))
         colnames(df.temp) <- df.colnames
         if (first) {
             first <- FALSE
