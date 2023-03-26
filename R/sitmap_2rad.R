@@ -12,11 +12,26 @@ lapply(required_packages, require, character.only = TRUE)
 # paths
 ############
 
+library(tidyverse)
+gcfl <- function() {
+    this_file <- commandArgs() %>%
+        tibble::enframe(name = NULL) %>%
+        tidyr::separate(col = value, into = c("key", "value"), sep = "=", fill = "right") %>%
+        dplyr::filter(key == "--file") %>%
+        dplyr::pull(value)
+    if (length(this_file) == 0) {
+        this_file <- rstudioapi::getSourceEditorContext()$path
+    }
+    return(dirname(this_file))
+} # https://stackoverflow.com/a/55322344
+
+path.wd <- paste0(gcfl(), "/../")
+
 # nastavit working directory
-path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/"
+# path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/"
 setwd(path.wd)
-path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/"
-path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
+path.data <- "../projects-data/"
+path.rgee <- "../../rgee/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
 # source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/sitmap_2rad/")
 

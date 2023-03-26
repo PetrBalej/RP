@@ -24,18 +24,34 @@ lapply(required_packages, require, character.only = TRUE)
 # paths
 ############
 
+
+library(tidyverse)
+gcfl <- function() {
+    this_file <- commandArgs() %>%
+        tibble::enframe(name = NULL) %>%
+        tidyr::separate(col = value, into = c("key", "value"), sep = "=", fill = "right") %>%
+        dplyr::filter(key == "--file") %>%
+        dplyr::pull(value)
+    if (length(this_file) == 0) {
+        this_file <- rstudioapi::getSourceEditorContext()$path
+    }
+    return(dirname(this_file))
+} # https://stackoverflow.com/a/55322344
+
+path.wd <- paste0(gcfl(), "/../")
+
 # "C:\Program Files\R\R-4.2.1\bin\x64\Rscript.exe" "C:\Users\petr\Documents\2023-03-20\RP\RP\R\ndopTGOBeval.R"
 
 # nastavit working directory
-path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/"
+# path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/"
 setwd(path.wd)
-path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
-path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
+path.data <- paste0(path.wd, "../projects-data/") # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
+path.rgee <- paste0(path.wd, "../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
 source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/ndopTGOBeval/")
 path.wd.prep.ndop <- paste0(path.wd, "dataPrep/ndop/")
 path.wd.prep.tgobEval <- paste0(path.wd, "dataPrep/ndopTGOBeval/")
-path.temp.res <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/modelsExport/merged/"
+path.temp.res <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/modelsExport29/merged/"
 source(paste0(path.wd, "shared.R"))
 ############
 # inputs
@@ -65,13 +81,13 @@ lsd.pa.centroids.syn.species <- unlist(unique(lsd.pa.centroids.syn$species))
 rds_list <-
     list.files(
         path.temp.res,
-        pattern = paste0("^skill_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
+        pattern = paste0("^ssos_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
         ignore.case = TRUE,
         full.names = TRUE
     )
 
 # do nastavení!!!
-tmp.group <- 3
+tmp.group <- 1
 tmp.perGroup <- ceiling(length(rds_list) / tmp.group)
 tmp.group.parts <- split(rds_list, ceiling(seq_along(rds_list) / tmp.perGroup))
 # omezím původní seznam
@@ -86,15 +102,15 @@ for (fpath in rds_list) {
     rds.l <- list()
     # dočasně rozdělené do dvou částí, nutno spojit:
     rds.l1 <- readRDS(fpath)
-    rds.l2 <- readRDS(str_replace(fpath, "skill", "skillb")) # !!! zakomentovat
+    # rds.l2 <- readRDS(str_replace(fpath, "skill", "skillb")) # !!! zakomentovat
 
     sp <- names(rds.l1)
     if (length(sp) > 1) {
         print("Více druhů v jednom souboru!")
         stop()
     }
-    rds.l[[sp]] <- append(rds.l1[[sp]], rds.l2[[sp]])
-    # !!! rds.l[[sp]] <- rds.l1[[sp]]
+    #  rds.l[[sp]] <- append(rds.l1[[sp]], rds.l2[[sp]])
+    rds.l[[sp]] <- rds.l1[[sp]] # !!!
 
     # nezávislá PA data z LSD pro daný druh
     lsd.temp <- lsd.pa.centroids.syn %>% filter(species == sp)
@@ -119,6 +135,11 @@ for (fpath in rds_list) {
                     rds.r[[sp]][[version]][[adjust]][[duplORnot]][[layer]] <- r.temp
                     ex.predicted <- extract(r.temp, st_coordinates(lsd.temp))
                     ev <- NA
+                    #
+                    # dopočíst a přidat další metriky z performance() (rgee)!!!
+                    # tam ale není nic co zohledňuje tn tp (bez poměru k fp)
+                    #
+
                     if (inherits(try({
                         ev <- sdm::evaluates(lsd.temp$presence, ex.predicted)
                     }), "try-error")) {
@@ -163,14 +184,14 @@ for (fpath in rds_list) {
                     first <- FALSE
                     out.t <- temp.t
                     col.names <- TRUE
-                    if (file.exists(paste0(path.wd.prep, "out.t.csv"))) {
+                    if (file.exists(paste0(path.wd.prep, "ssos.out.t.csv"))) {
                         # pokud už paralelně v jiném procesu soubor vznikl, nevkládám znovu názvy sloupců
                         col.names <- FALSE
                     }
-                    write.table(temp.t, paste0(path.wd.prep, "out.t.csv"), sep = ",", row.names = FALSE, col.names = col.names, append = TRUE)
+                    write.table(temp.t, paste0(path.wd.prep, "ssos.out.t.csv"), sep = ",", row.names = FALSE, col.names = col.names, append = TRUE)
                 } else {
                     out.t %<>% add_row(temp.t)
-                    write.table(temp.t, paste0(path.wd.prep, "out.t.csv"), sep = ",", row.names = FALSE, col.names = FALSE, append = TRUE)
+                    write.table(temp.t, paste0(path.wd.prep, "ssos.out.t.csv"), sep = ",", row.names = FALSE, col.names = FALSE, append = TRUE)
                 }
 
 
@@ -180,10 +201,11 @@ for (fpath in rds_list) {
     }
 
 
-    # ukládat per species?
+    # ukládat per species - nutno - jinak je výsledné rds s rastery predikcí extrémně velké a nenačitatelné/neuložitelné
+    saveRDS(out.t, paste0(path.wd.prep, "ssos.out.t.c_", sp, "_", as.character(cmd_arg), ".rds")) # !!! nové názvy, nepřepsat původní
+    saveRDS(rds.r, paste0(path.wd.prep, "ssos.rds.r.c_", sp, "_", as.character(cmd_arg), ".rds")) # !!!
 }
-saveRDS(out.t, paste0(path.wd.prep, "out.t.c", as.character(cmd_arg), ".rds")) # !!! nové názvy, nepřepsat původní
-saveRDS(rds.r, paste0(path.wd.prep, "rds.r.c", as.character(cmd_arg), ".rds")) # !!!
+
 
 
 # stop()

@@ -10,21 +10,6 @@ if (is.na(cmd_arg[1])) {
 
 print(cmd_arg)
 
-library(tidyverse)
-gcfl <- function() {
-    this_file <- commandArgs() %>%
-        tibble::enframe(name = NULL) %>%
-        tidyr::separate(col = value, into = c("key", "value"), sep = "=", fill = "right") %>%
-        dplyr::filter(key == "--file") %>%
-        dplyr::pull(value)
-    if (length(this_file) == 0) {
-        this_file <- rstudioapi::getSourceEditorContext()$path
-    }
-    return(dirname(this_file))
-} # https://stackoverflow.com/a/55322344
-
-path.wd <- paste0(gcfl(), "/../")
-
 
 # *** Running ENMeval v2.0.4 with maxnet from maxnet package v0.1.4 *** -- na WS1
 # "C:/Users/svc.kagup/AppData/Local/Programs/R/R-4.2.1/bin/x64/Rscript.exe" "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/R/ndopTGOB.R" 1
@@ -42,11 +27,26 @@ lapply(required_packages, require, character.only = TRUE)
 # paths
 ############
 
+library(tidyverse)
+gcfl <- function() {
+    this_file <- commandArgs() %>%
+        tibble::enframe(name = NULL) %>%
+        tidyr::separate(col = value, into = c("key", "value"), sep = "=", fill = "right") %>%
+        dplyr::filter(key == "--file") %>%
+        dplyr::pull(value)
+    if (length(this_file) == 0) {
+        this_file <- rstudioapi::getSourceEditorContext()$path
+    }
+    return(dirname(this_file))
+} # https://stackoverflow.com/a/55322344
+
+path.wd <- paste0(gcfl(), "/../")
+
 # nastavit working directory
 # path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/"
 setwd(path.wd)
-path.data <- paste0(path.wd, "/../projects-data/") # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
-path.rgee <- paste0(path.wd, "/../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
+path.data <- paste0(path.wd, "../projects-data/") # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
+path.rgee <- paste0(path.wd, "../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
 source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/ndopTGOB/")
 path.wd.prep.ndop <- paste0(path.wd, "dataPrep/ndop/")

@@ -12,18 +12,33 @@ lapply(required_packages, require, character.only = TRUE)
 # paths
 ############
 
+library(tidyverse)
+gcfl <- function() {
+    this_file <- commandArgs() %>%
+        tibble::enframe(name = NULL) %>%
+        tidyr::separate(col = value, into = c("key", "value"), sep = "=", fill = "right") %>%
+        dplyr::filter(key == "--file") %>%
+        dplyr::pull(value)
+    if (length(this_file) == 0) {
+        this_file <- rstudioapi::getSourceEditorContext()$path
+    }
+    return(dirname(this_file))
+} # https://stackoverflow.com/a/55322344
+
+path.wd <- paste0(gcfl(), "/../")
+
 # "C:\Program Files\R\R-4.2.1\bin\x64\Rscript.exe" "C:\Users\petr\Documents\2023-03-20\RP\RP\R\ndopTGOBeval.R"
 
 # nastavit working directory
-path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/"
+# path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/"
 setwd(path.wd)
-path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
-path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
+path.data <- paste0(path.wd, "../projects-data/") # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
+path.rgee <- paste0(path.wd, "../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
 source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/ndopTGOBeval/")
 path.wd.prep.ndop <- paste0(path.wd, "dataPrep/ndop/")
 path.wd.prep.tgobEval <- paste0(path.wd, "dataPrep/ndopTGOBeval/")
-path.temp.res <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/modelsExport/merged/"
+path.temp.res <- paste0(path.wd, "/../../modelsExport/merged/")
 source(paste0(path.wd, "shared.R"))
 ############
 # inputs
@@ -125,9 +140,9 @@ visDiff2 <- rds.out.null.compare %>%
     filter(duplORnot == "uniq") %>%
     dplyr::select(Diff)
 
-boxplot(list("dupl" = visDiff1$Diff, "uniq" = visDiff2$Diff))
-hist(abs(visDiff1$Diff))
-hist(abs(visDiff2$Diff))
+# boxplot(list("dupl" = visDiff1$Diff, "uniq" = visDiff2$Diff))
+# hist(abs(visDiff1$Diff))
+# hist(abs(visDiff2$Diff))
 
 #
 # dif vůči random
@@ -143,7 +158,7 @@ vs.null <- rds.out %>%
 # porovnání nej z jednotlivých základních verzí - neřeším adjusty ani šířku thinu!!!  (4176 / 2 / 116 = 18 verzí - mám ale 19 verzí - všechny nemají dupl/unique varianty - nemůžu dělit 2...)
 
 vs.all <- rds.out %>%
-    # filter(adjust != 0) %>% # ponechávám všechny interní random verze ("0") - neměl bych dělat porovnání s interními random verzemi?
+    filter(adjust != 0) %>% # ponechávám všechny interní random verze ("0") - neměl bych dělat porovnání s interními random verzemi?
     group_by(species, version, duplORnot) %>%
     slice_max(AUC, n = 1, with_ties = FALSE) # %>% # zde neřeším více modelů se stejně vysokým AUC
 # mutate(compareGroup = paste0(species, "-", version, "-", duplORnot))
@@ -188,7 +203,8 @@ write.csv(vs.all.compare.order, paste0(path.wd.prep, "vs.all.compare.order.csv")
 
 # # # # # # udělat místo toho per species rozdíly dupl/uniq a ty dát do boxplotů?
 
-# uniq vs. dupl - jsou rozdíly
+dOu <- "dupl"
+# uniq vs. dupl - jsou rozdíly + dupld
 ggplot(vs.all.compare, aes(x = version, y = AUC.diff, fill = duplORnot)) +
     geom_boxplot()
 ggsave(paste0(path.wd.prep, "duplORnot.png"))
@@ -203,26 +219,28 @@ ggsave(paste0(path.wd.prep, "duplORnot.png"))
 
 
 # vnucení řezení podle mediánu
-group_ordered <- with(droplevels(vs.all.compare.order %>% filter(duplORnot == "dupl") %>% na.omit()), reorder(short, AUC.diff.median))
-vs.all.compare.reorder <- droplevels(vs.all.compare %>% filter(duplORnot == "dupl") %>% na.omit())
+group_ordered <- with(droplevels(vs.all.compare.order %>% filter(duplORnot == dOu) %>% na.omit()), reorder(short, AUC.diff.median))
+vs.all.compare.reorder <- droplevels(vs.all.compare %>% filter(duplORnot == dOu) %>% na.omit())
 vs.all.compare.reorder$short <- factor(vs.all.compare.reorder$short, levels = levels(group_ordered))
 
 # boxploty s verzemi
 ggplot(vs.all.compare.reorder, aes(x = short, y = AUC.diff, fill = group)) +
     geom_boxplot() +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
-    scale_fill_manual(values = c("lawngreen", "limegreen", "darkgreen", "salmon", "red", "darkred"))
-ggsave(paste0(path.wd.prep, "vs.all.compare.reorder.png"))
+    scale_fill_manual(values = c("#C7FFC7", "limegreen", "darkgreen", "#FAA0A0", "indianred", "darkred")) +
+    ggtitle(dOu)
+ggsave(paste0(path.wd.prep, "vs.all.compare.reorder_", dOu, ".png"))
 
 # odstraním outliery
 ggplot(vs.all.compare.reorder, aes(x = short, y = AUC.diff, fill = group)) +
     geom_boxplot(outlier.shape = NA) +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
-    scale_fill_manual(values = c("lawngreen", "limegreen", "darkgreen", "salmon", "red", "darkred")) +
+    scale_fill_manual(values = c("#C7FFC7", "limegreen", "darkgreen", "#FAA0A0", "indianred", "darkred")) +
     # scale_y_continuous(limits = c(-0.1, 0.2))
     # coord_cartesian(ylim = quantile(vs.all.compare.reorder$AUC.diff, c(0.1, 0.9)))
-    coord_cartesian(ylim = c(-0.1, 0.17))
-ggsave(paste0(path.wd.prep, "vs.all.compare.reorder.outliers.png"))
+    coord_cartesian(ylim = c(-0.1, 0.17)) +
+    ggtitle(dOu)
+ggsave(paste0(path.wd.prep, "vs.all.compare.reorder.outliers_", dOu, ".png"))
 
 # porovnání napříč druhy??? předchozí hrafy jsou hrubé a nezohledňují kterým druhům korekce pomohla, mohlas e u jiných druhů projevit jinak...
 

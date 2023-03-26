@@ -12,11 +12,26 @@ lapply(required_packages, require, character.only = TRUE)
 # paths
 ############
 
+library(tidyverse)
+gcfl <- function() {
+  this_file <- commandArgs() %>%
+    tibble::enframe(name = NULL) %>%
+    tidyr::separate(col = value, into = c("key", "value"), sep = "=", fill = "right") %>%
+    dplyr::filter(key == "--file") %>%
+    dplyr::pull(value)
+  if (length(this_file) == 0) {
+    this_file <- rstudioapi::getSourceEditorContext()$path
+  }
+  return(dirname(this_file))
+} # https://stackoverflow.com/a/55322344
+
+path.wd <- paste0(gcfl(), "/../")
+
 # nastavit working directory
-path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/"
+# path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/"
 setwd(path.wd)
-path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/"
-path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
+path.data <- "../projects-data/"
+path.rgee <- "../../rgee/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
 # source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.wd.prep <- paste0(path.wd, "dataPrep/ndop/")
 
@@ -32,7 +47,7 @@ SPH_STAT.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_STAT.
 ############
 # settings
 ############
-ndop.fs <- list("months" = c(4:6), "years" = c(2019:2022), "precision" = 1000, "version" = "v1")
+ndop.fs <- list("months" = c(4:6), "years" = c(2014:2017), "precision" = 1000, "version" = "v1")
 
 
 st_crs(SPH_STAT.source) <- 4326
@@ -44,14 +59,16 @@ ndop_ugc <-
            season_months_range = list(from = 4, to = 7),
            import_path_ndop = "/../ndop/csv",
            res_crs = 5514,
-           presicion = 100) {
+           presicion = 100,
+           removeLSD = FALSE) {
     col_types <- cols_only(
       DATUM_DO = col_date("%Y%m%d"),
       DATUM_OD = col_date("%Y%m%d"),
       ZDROJ = "c", SITMAP = "i", X = "d", Y = "d", DAT_SADA = "c",
       CXPRESNOST = "d", PROJEKT = "c", KAT_TAX = "f", DRUH = "f",
       GARANCE = "c", VALIDACE = "c", ID_NALEZ = "n", NEGATIV = "i",
-      VEROH = "i", AUTOR = "f"
+      VEROH = "i", AUTOR = "f",
+      UMIST_NAL = "c"
     )
 
     # načte všechny *.csv z import_path_ndop
@@ -72,6 +89,14 @@ ndop_ugc <-
         locale = locale("cs", decimal_mark = ",")
       )
 
+    if (removeLSD) {
+      # čtverec 2rad má cca 3x3 km (reálně trochu méně) polovina úhlopříčky je sqrt(3^2+3^2)/2 = 2.1 (bezpečnější je spodní hranice cca 1.8)
+      # přesnost (CXPRESNOST) <1800m tedy odstraní LSD a Hodinovkové datasety AVIFu automaticky!!!
+      # do budoucna na to ale nelze spoléhat, pokud bych z nějakého důvodu uznal za dostatečné přesnosti větší než 1.8 km!!!
+      print("LSD dataset odstraněn")
+      csv_ndop %<>% filter(str_detect(UMIST_NAL, "Liniové sčítání druhů") %in% c(FALSE, NA)) # str_detect nad NA vrací NA, ne T/F
+      # lze dofiltrovat i Hodinovky z NDOP?
+    }
 
     # základní dofiltrovaní nálezů z NDOPu
     csv_ndop_filter <- csv_ndop %>%
@@ -162,7 +187,6 @@ saveRDS(ndop.ff, paste0(path.wd.prep, "ndop.ff.rds"))
 # pouze víceslovní autoři
 ndop.ff.au.more <- ndop.ff %>% filter(AUTOR %in% au.base.more)
 nrow(ndop.ff.au.more) # 425008
-
 
 
 # počet nálezů na autora
