@@ -24,8 +24,6 @@ lapply(required_packages, require, character.only = TRUE)
 # paths
 ############
 
-
-library(tidyverse)
 gcfl <- function() {
     this_file <- commandArgs() %>%
         tibble::enframe(name = NULL) %>%
@@ -41,6 +39,7 @@ gcfl <- function() {
 path.wd <- paste0(gcfl(), "/../")
 
 # "C:\Program Files\R\R-4.2.1\bin\x64\Rscript.exe" "C:\Users\petr\Documents\2023-03-20\RP\RP\R\ndopTGOBeval.R"
+# Rscript /mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/R/ndopTGOBeval.R 
 
 # nastavit working directory
 # path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/"
@@ -48,11 +47,11 @@ setwd(path.wd)
 path.data <- paste0(path.wd, "../projects-data/") # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
 path.rgee <- paste0(path.wd, "../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
 source(paste0(path.rgee, "R/export_raster/functions.R"))
-path.wd.prep <- paste0(path.wd, "dataPrep/ndopTGOBeval/")
-path.wd.prep.ndop <- paste0(path.wd, "dataPrep/ndop/")
-path.wd.prep.tgobEval <- paste0(path.wd, "dataPrep/ndopTGOBeval/")
+path.wd.prep <- paste0(path.wd, "../dataPrep/ndopTGOBeval/")
+path.wd.prep.ndop <- paste0(path.wd, "../dataPrep/ndop/")
+path.wd.prep.tgobEval <- paste0(path.wd, "../dataPrep/ndopTGOBeval/")
 path.temp.res <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/modelsExport29/merged/"
-source(paste0(path.wd, "shared.R"))
+source(paste0(path.wd, "R/shared.R"))
 ############
 # inputs
 ############
@@ -87,18 +86,20 @@ rds_list <-
     )
 
 # do nastavení!!!
-tmp.group <- 1
+tmp.group <- 4
 tmp.perGroup <- ceiling(length(rds_list) / tmp.group)
 tmp.group.parts <- split(rds_list, ceiling(seq_along(rds_list) / tmp.perGroup))
 # omezím původní seznam
 rds_list <- tmp.group.parts[[cmd_arg]]
 print(rds_list)
 
-out.t <- list()
-rds.r <- list()
-first <- TRUE
+
+
 # cyklíme...
 for (fpath in rds_list) {
+first <- TRUE
+out.t <- list()
+rds.r <- list()
     rds.l <- list()
     # dočasně rozdělené do dvou částí, nutno spojit:
     rds.l1 <- readRDS(fpath)

@@ -12,7 +12,6 @@ lapply(required_packages, require, character.only = TRUE)
 # paths
 ############
 
-library(tidyverse)
 gcfl <- function() {
   this_file <- commandArgs() %>%
     tibble::enframe(name = NULL) %>%
@@ -33,21 +32,21 @@ setwd(path.wd)
 path.data <- "../projects-data/"
 path.rgee <- "../../rgee/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
 # source(paste0(path.rgee, "R/export_raster/functions.R"))
-path.wd.prep <- paste0(path.wd, "dataPrep/ndop/")
+path.wd.prep <- paste0(path.wd, "../dataPrep/ndop/")
 
 
 
 ############
 # inputs
 ############
-ndop.csv.path <- paste0(path.data, "aopk/ndop/download20230307/")
+ndop.csv.path <- paste0(path.data, "aopk/ndop/download20230307/") # download20230328 - 2014-2017: v řadě krajů (~RP) není garantována ani validována značná část nálezů - nepoužitelné!!!
 sitmap_2rad.czechia <- readRDS(paste0(path.wd, "dataPrep/sitmap_2rad/sitmap_2rad-czechia.rds")) # 4326
 SPH_STAT.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_STAT.shp"))
 
 ############
 # settings
 ############
-ndop.fs <- list("months" = c(4:6), "years" = c(2014:2017), "precision" = 1000, "version" = "v1")
+ndop.fs <- list("months" = c(4:6), "years" = c(2019:2022), "precision" = 1000, "version" = "v1")
 
 
 st_crs(SPH_STAT.source) <- 4326
@@ -146,6 +145,9 @@ ndop_ugc <-
     return(csv_ndop_filter)
   }
 
+############
+# execution
+############
 
 # zvážit jiný filtr garance?
 ndop.ff <- ndop_ugc(
@@ -162,6 +164,8 @@ ndop.ff %<>% filter(KAT_TAX == "Ptáci")
 
 # odstraním diakritiku a převedu na malá písmena
 ndop.ff %<>% mutate(AUTOR = tolower(stri_trans_general(str = AUTOR, id = "Latin-ASCII")))
+ndop.ff %<>% mutate(AUTOR = str_replace(AUTOR, "\\.", "\\. "))
+
 ndop.ff <- droplevels(ndop.ff)
 
 
@@ -177,6 +181,7 @@ write.csv(au.base.one, file = paste0(path.wd.prep, "autors-check-single-remove.c
 au.base.more <- au.base[stri_count_fixed(au.base, " ") > 0]
 
 # dofiltr podezřelých a problematických autorů
+au.base.more <- au.base.more[!str_detect(au.base.more, "anonym|krouzkovaci stanice")]
 length(au.base.more)
 write.csv(au.base.more, file = paste0(path.wd.prep, "autors-check.csv"), row.names = FALSE)
 
@@ -205,24 +210,25 @@ ndop.ff.au.more.sps <- ndop.ff.au.more %>%
 saveRDS(ndop.ff.au.more.sps, paste0(path.wd.prep, "ndop.ff.au.more.sps.rds"))
 
 
-boxplot(ndop.ff.au.more.occs$occs)
-boxplot(ndop.ff.au.more.sps$sps)
+# boxplot(ndop.ff.au.more.occs$occs)
+# boxplot(ndop.ff.au.more.sps$sps)
 
-ggplot(ndop.ff.au.more.occs, aes(y = occs)) +
-  geom_boxplot() +
-  scale_y_log10()
-ggplot(ndop.ff.au.more.occs, aes(x = occs)) +
-  geom_histogram() +
-  scale_x_log10()
+# ggplot(ndop.ff.au.more.occs, aes(y = occs)) +
+#   geom_boxplot() +
+#   scale_y_log10()
+
+# ggplot(ndop.ff.au.more.occs, aes(x = occs)) +
+#   geom_histogram() +
+#   scale_x_log10()
 
 
 # koreluje počet druhů s počtem nálezů (per autor?)
 ndop.occsXsps <- ndop.ff.au.more.occs %>% left_join(ndop.ff.au.more.sps, by = "AUTOR")
 
-# Default scatter plot
-sp <- ggplot(ndop.occsXsps, aes(x = occs, y = sps)) +
-  geom_point()
-sp + scale_x_continuous(trans = "log10") + scale_y_continuous(trans = "log10")
+# # Default scatter plot
+# sp <- ggplot(ndop.occsXsps, aes(x = occs, y = sps)) +
+#   geom_point()
+# sp + scale_x_continuous(trans = "log10") + scale_y_continuous(trans = "log10")
 
 
 
@@ -345,30 +351,12 @@ for (druh in druhy) {
 saveRDS(df.out, paste0(path.wd.prep, "df.out.rds"))
 write.csv(df.out, paste0(path.wd.prep, "df.out.csv"))
 
-
-
-
-# uložení rozdělených dat per species pro model
-
-
-plot(sitmap_2rad.czechia)
-
 # vygenerovat i mapy presencí druhu (počet) a backgroundu podle odpovídajících autorů (počty i per pixel)
 
 
-
-############
-# execution
-############
-
-
-
-
-stop()
 # TODO: cross check - odpovídají názvy kvadrátů ze SiteName reálně poloze (Lat, Lon)? - udělat i prostorový průnik se sítí
-lsd.filter %>% left_join(sitmap_2rad.source, by = "POLE")
-
-st.sitmap_2rad.centroids <- st_centroid(st.sitmap_2rad)
+# lsd.filter %>% left_join(sitmap_2rad.source, by = "POLE")
+# st.sitmap_2rad.centroids <- st_centroid(st.sitmap_2rad)
 
 # minimum x presenci a y absencí - možné až po získání prediktorů a "děr"
 

@@ -106,7 +106,7 @@ bb <- cesko
 # pro paper1-observert skills
 
 # rozsah snímků od/do
-years_range <- list(from = "2019-01-01", to = "2022-12-31")
+years_range <- list(from = "2014-01-01", to = "2017-12-31")
 
 # rozsah jedné sezóny v měsících (podvýběr z vybraného období years_range výše), možno i více sezón
 season_months_range <- list(c(4, 4), c(5, 5), c(6, 6))
@@ -326,7 +326,7 @@ for (half in names(sitmap_2rad)) {
             sf = FALSE
         )
     }
-    saveRDS(output_df, file = paste0(path.igaD, "clean/predictors/kfme16-l8-", half, "_czechia_wc_l8_2019-2022_4-6.rds"))
+    saveRDS(output_df, file = paste0(path.igaD, "clean/predictors2014-17/kfme16-l8-", half, "_czechia_wc_l8_2014-2017_4-6.rds"))
     output_df <- list()
     gc()
 
@@ -357,7 +357,7 @@ for (half in names(sitmap_2rad)) {
         fun = ee$Reducer$median(),
         sf = FALSE
     )
-    saveRDS(output_df, file = paste0(path.igaD, "clean/predictors/kfme16-bioA-", half, "_czechia_wc_l8_2019-2022_4-6.rds"))
+    saveRDS(output_df, file = paste0(path.igaD, "clean/predictors2014-17/kfme16-bioA-", half, "_czechia_wc_l8_2014-2017_4-6.rds"))
     output_df <- list()
     gc()
 
@@ -370,13 +370,13 @@ for (half in names(sitmap_2rad)) {
         fun = ee$Reducer$median(),
         sf = FALSE
     )
-    saveRDS(output_df, file = paste0(path.igaD, "clean/predictors/kfme16-bioB-", half, "_czechia_wc_l8_2019-2022_4-6.rds"))
+    saveRDS(output_df, file = paste0(path.igaD, "clean/predictors2014-17/kfme16-bioB-", half, "_czechia_wc_l8_2014-2017_4-6.rds"))
     output_df <- list()
     gc()
 
 
     # saveRDS(output_df, file = paste0(path.igaD, "test-kfme16-N_czechia_wc_l8_2018-2021_4-6.rds"))
-    # saveRDS(output_df, file = paste0(path.igaD, "clean/predictors/kfme16-", half, "_czechia_wc_l8_2019-2022_4-6.rds"))
+    # saveRDS(output_df, file = paste0(path.igaD, "clean/predictors/kfme16-", half, "_czechia_wc_l8_2014-2017_4-6.rds"))
 }
 
 end_time <- Sys.time()
@@ -398,14 +398,14 @@ stop()
 
 rds_list_N <-
     list.files(
-        paste0(path.igaD, "clean/predictors/observerSkill"),
+        paste0(path.igaD, "clean/predictors2014-17/observerSkill"),
         pattern = paste0("[N][_]"),
         ignore.case = TRUE,
         full.names = TRUE
     )
 rds_list_S <-
     list.files(
-        paste0(path.igaD, "clean/predictors/observerSkill"),
+        paste0(path.igaD, "clean/predictors2014-17/observerSkill"),
         pattern = paste0("[S][_]"),
         ignore.case = TRUE,
         full.names = TRUE
@@ -435,8 +435,8 @@ parts.a <- append(list("wc_30_6_mean" = append(parts.out[[1]][[bioName]], parts.
 kfme16 <- parts.a
 
 # ####### nové načítání L8 a WC
-# kfme16.N <- readRDS(paste0(path.igaD, "clean/predictors/kfme16-N_czechia_wc_l8_2019-2022_4-6.rds"))
-# kfme16.S <- readRDS(paste0(path.igaD, "clean/predictors/kfme16-S_czechia_wc_l8_2019-2022_4-6.rds"))
+# kfme16.N <- readRDS(paste0(path.igaD, "clean/predictors/kfme16-N_czechia_wc_l8_2014-2017_4-6.rds"))
+# kfme16.S <- readRDS(paste0(path.igaD, "clean/predictors/kfme16-S_czechia_wc_l8_2014-2017_4-6.rds"))
 
 # # sloučit N a S
 # for (l1 in names(kfme16.N)) {
@@ -479,7 +479,7 @@ for (l1 in names(kfme16)) {
         rr <- rasterize(m, r, field = band)
         crs(rr) <- 4326
 
-        writeRaster(rr, paste0(path.igaD, "clean/predictors/observerSkill/kfme16-", l1, "-", band, ".tif"), format = "GTiff", overwrite = TRUE)
+        writeRaster(rr, paste0(path.igaD, "clean/predictors2014-17/observerSkill/kfme16-", l1, "-", band, ".tif"), format = "GTiff", overwrite = TRUE)
     }
 }
 
@@ -489,14 +489,14 @@ for (l1 in names(kfme16)) {
 raster_stack <-
     rasters_dir_stack(
         paste0(
-            path.igaD, "clean/predictors/observerSkill/"
+            path.igaD, "clean/predictors2014-17/observerSkill/"
         ),
         "tif"
     )
 
 tif_names <-
     list.files(
-        paste0(path.igaD, "clean/predictors/observerSkill"),
+        paste0(path.igaD, "clean/predictors2014-17/observerSkill"),
         pattern = paste0("tif$"),
         ignore.case = TRUE,
         full.names = FALSE
@@ -508,15 +508,15 @@ names(raster_stack) <- str_replace_all(tif_names, c("\\.tif" = "", "kfme16-" = "
 raster_stack <- dropLayer(raster_stack, grep("B10", names(raster_stack), ignore.case = TRUE))
 length(names(raster_stack)) # 52
 
-rr <- writeRaster(raster_stack, paste0(path.igaD, "clean/predictors/observerSkill/preds_base.grd"), format = "raster", overwrite = TRUE)
+rr <- writeRaster(raster_stack, paste0(path.igaD, "clean/predictors2014-17/observerSkill/preds_base.grd"), format = "raster", overwrite = TRUE)
 hdr(rr, format = "ENVI")
-saveRDS(raster_stack, paste0(path.igaD, "clean/predictors/observerSkill/preds_base.rds"))
+saveRDS(raster_stack, paste0(path.igaD, "clean/predictors2014-17/observerSkill/preds_base.rds"))
 
 
 
 
 
-pdf(paste0(path.igaD, "clean/predictors/observerSkill/check_visually.pdf"), width = 12, height = 9)
+pdf(paste0(path.igaD, "clean/predictors2014-17/observerSkill/check_visually.pdf"), width = 12, height = 9)
 for (l in sort(names(raster_stack))) {
     # plot(normalize(raster_stack[[l]]), main=l)
     plot(raster_stack[[l]], main = l)
@@ -524,50 +524,39 @@ for (l in sort(names(raster_stack))) {
 dev.off()
 
 # dropnout květen - artefakty s nepovedeným švem v JČ a některé bio také artefakty nebo nepřirozené gradienty
-raster_stack <- dropLayer(raster_stack, grep("_5_|bio08|bio09|bio15", names(raster_stack), ignore.case = TRUE))
+# dropnout červen (2014-2017) - artefakty s nepovedeným švem v Kralický Sněžník a některé bio také artefakty nebo nepřirozené gradienty
+raster_stack <- dropLayer(raster_stack, grep("_6_|bio08|bio09|bio15", names(raster_stack), ignore.case = TRUE))
 length(names(raster_stack)) # 52
 
 
-pdf(paste0(path.igaD, "clean/predictors/observerSkill/check_visually_final.pdf"), width = 12, height = 9)
+pdf(paste0(path.igaD, "clean/predictors2014-17/observerSkill/check_visually_final.pdf"), width = 12, height = 9)
 for (l in sort(names(raster_stack))) {
     # plot(normalize(raster_stack[[l]]), main=l)
     plot(raster_stack[[l]], main = l)
 }
 dev.off()
 
-rr <- writeRaster(raster_stack, paste0(path.igaD, "clean/predictors/observerSkill/preds_final.grd"), format = "raster", overwrite = TRUE)
+rr <- writeRaster(raster_stack, paste0(path.igaD, "clean/predictors2014-17/observerSkill/preds_final.grd"), format = "raster", overwrite = TRUE)
 hdr(rr, format = "ENVI")
-saveRDS(raster_stack, paste0(path.igaD, "clean/predictors/observerSkill/preds_final.rds"))
+saveRDS(raster_stack, paste0(path.igaD, "clean/predictors2014-17/observerSkill/preds_final.rds"))
 
+stop()
+#
+# VIF
+#
 
-# předchozí kód je mimo RP, z rgee, nutno uzpůsobit
-
-# PCA/vif
-library(RStoolbox)
-library(raster)
-raster_stack <- readRDS(paste0(path.wd, "dataPrep/observerSkill/preds_final.rds"))
-# PCA všech 23
-pcamap <- rasterPCA(raster_stack, spca = TRUE)
-summary(pcamap$model)
-saveRDS(pcamap, paste0(path.wd, "dataPrep/observerSkill/pcamap.rds"))
-
-
-# prvních 6 os vysvětluje > 90% total variance, uložit
-rs <- stack(pcamap$map[[1:6]])
-saveRDS(rs, paste0(path.wd, "dataPrep/observerSkill/pcamap6.rds"))
-rr <- writeRaster(rs, paste0(path.wd, "dataPrep/observerSkill/pcamap6.rds"), format = "raster", overwrite = TRUE)
-hdr(rr, format = "ENVI")
-
-
+raster_stack <- readRDS(paste0(path.igaD, "clean/predictors2014-17/observerSkill/preds_final.rds"))
 
 library(usdm)
-raster_stack <- readRDS(paste0(path.wd, "dataPrep/observerSkill/preds_final.rds"))
 
-vs <- vifstep(raster_stack, th=2)
-# vc <- vifcor(raster_stack[[vs@results$Variables]], th=0.7)
+# vifstep
+vs <- vifstep(raster_stack, th = 2)
+# vifcor - jen pro dofiltr, asi není nutné
+vs.vc <- vifcor(raster_stack[[vs@results$Variables]], th = 0.7)
+print(vs.vc@results$Variables)
 
-rs <- raster_stack[[vs@results$Variables]]
-saveRDS(rs, paste0(path.wd, "dataPrep/observerSkill/vifstep2.rds"))
-rr <- writeRaster(rs, paste0(path.wd, "dataPrep/observerSkill/vifstep2.rds"), format = "raster", overwrite = TRUE)
-hdr(rr, format = "ENVI")
 
+library(RStoolbox)
+# PCA vs.vc
+pcamap <- rasterPCA(raster_stack, spca = TRUE)
+summary(pcamap$model)

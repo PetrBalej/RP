@@ -12,19 +12,32 @@ lapply(required_packages, require, character.only = TRUE)
 # paths
 ############
 
+gcfl <- function() {
+  this_file <- commandArgs() %>%
+    tibble::enframe(name = NULL) %>%
+    tidyr::separate(col = value, into = c("key", "value"), sep = "=", fill = "right") %>%
+    dplyr::filter(key == "--file") %>%
+    dplyr::pull(value)
+  if (length(this_file) == 0) {
+    this_file <- rstudioapi::getSourceEditorContext()$path
+  }
+  return(dirname(this_file))
+} # https://stackoverflow.com/a/55322344
+
+path.wd <- paste0(gcfl(), "/../")
 # nastavit working directory
-path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/"
+# path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/"
 setwd(path.wd)
-path.data <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/projects-data/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
-path.rgee <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/rgee/" # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
+path.data <- "../projects-data/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/projects-data/"
+path.rgee <- "../../rgee/" # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
 source(paste0(path.rgee, "R/export_raster/functions.R"))
-path.wd.prep <- paste0(path.wd, "dataPrep/hodinovka/") # hodinovka / lsd
+path.wd.prep <- paste0(path.wd, "../dataPrep/lsd/") # hodinovka / lsd
 
 ############
 # inputs
 ############
 # hodinovka/export-20230326.csv lsd/export-20230223.csv
-lsd.source <- read_delim(paste0(path.data, "hodinovka/export-20230326.csv"), delim = ";", locale = locale(encoding = "Windows-1250")) #  ISO-8859-2
+lsd.source <- read_delim(paste0(path.data, "lsd/export-20230223.csv"), delim = ";", locale = locale(encoding = "Windows-1250")) #  ISO-8859-2
 
 sitmap_2rad.czechia <- readRDS(paste0(path.wd, "dataPrep/sitmap_2rad/sitmap_2rad-czechia.rds"))
 SPH_STAT.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_STAT.shp"))
@@ -33,7 +46,7 @@ SPH_KRAJ.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_KRAJ.
 ############
 # settings
 ############
-lsd.fs <- list("minMin" = 50, "months" = c(4:6), "years" = c(2014:2017), "minSurveys" = 3, "minPA" = 30, "version" = "v1")
+lsd.fs <- list("minMin" = 50, "months" = c(4:6), "years" = c(2019:2022), "minSurveys" = 3, "minPA" = 10, "version" = "v1")
 
 ############
 # execution
@@ -111,7 +124,7 @@ if (nrow(lsd.filter.codes.anti) > 0) {
   print(lsd.filter.codes.anti)
 }
 lsd.filter.codes.join$POLE_2rad <- NA
-
+lsd.filter.codes.join$POLE_2rad %<>% as.character
 
 # spojím obě verze
 lsd.filter.codes.join %<>% add_row(lsd.filter.coords)

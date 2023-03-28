@@ -27,7 +27,6 @@ lapply(required_packages, require, character.only = TRUE)
 # paths
 ############
 
-library(tidyverse)
 gcfl <- function() {
     this_file <- commandArgs() %>%
         tibble::enframe(name = NULL) %>%
