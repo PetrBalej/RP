@@ -43,7 +43,7 @@ source(paste0(path.wd, "shared.R"))
 # inputs
 ############
 # uložit si results, rastery a udělat evaluate; ukládat i počty presencí a bg (z modelů) a WKT presencí (NDOP i LSD)
-lsd.pa.centroids <- readRDS(paste0(path.wd, "dataPrep/lsd/lsd.pa.centroids.rds"))
+lsd.pa.centroids <- readRDS(paste0(path.wd, "../dataPrep/lsd/lsd.pa.centroids.rds"))
 
 # synonyma (mám funkci v rgee)
 # evaluace všech predikcí z ENMeval přes LSD PA pomocí sdm::evaluates(observed, predicted)
