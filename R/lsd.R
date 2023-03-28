@@ -46,7 +46,7 @@ SPH_KRAJ.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_KRAJ.
 ############
 # settings
 ############
-lsd.fs <- list("minMin" = 50, "months" = c(4:6), "years" = c(2019:2022), "minSurveys" = 3, "minPA" = 10, "version" = "v1")
+lsd.fs <- list("minMin" = 50, "months" = c(4:6), "years" = c(2019:2022), "minSurveys" = 4, "minPA" = 10, "version" = "v1")
 
 ############
 # execution
@@ -138,7 +138,7 @@ POLE.ObsListsID.freq <- lsd.filter %>%
   group_by(POLE) %>%
   summarise(visits = n_distinct(ObsListsID)) %>%
   # arrange(desc(visits)) %>%
-  filter(visits >= lsd.fs[["minSurveys"]])
+  filter(visits >= lsd.fs$minSurveys)
 nrow(POLE.ObsListsID.freq)
 
 
