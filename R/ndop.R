@@ -24,23 +24,23 @@ gcfl <- function() {
   return(dirname(this_file))
 } # https://stackoverflow.com/a/55322344
 
-path.wd <- paste0(gcfl(), "/../")
+path.wd <- paste0(gcfl(), "/")
 
 # nastavit working directory
 # path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/"
 setwd(path.wd)
-path.data <- "../projects-data/"
-path.rgee <- "../../rgee/" # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
+path.data <- paste0(path.wd, "../../projects-data/")
+path.prep <- paste0(path.wd, "../../dataPrep/")
+# path.rgee <- paste0(path.wd, "../../../rgee/") # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
 # source(paste0(path.rgee, "R/export_raster/functions.R"))
-path.wd.prep <- paste0(path.wd, "../dataPrep/ndop/")
-
+path.ndop <- paste0(path.prep, "ndop/")
 
 
 ############
 # inputs
 ############
 ndop.csv.path <- paste0(path.data, "aopk/ndop/download20230307/") # download20230328 - 2014-2017: v řadě krajů (~RP) není garantována ani validována značná část nálezů - nepoužitelné!!!
-sitmap_2rad.czechia <- readRDS(paste0(path.wd, "dataPrep/sitmap_2rad/sitmap_2rad-czechia.rds")) # 4326
+sitmap_2rad.czechia <- readRDS(paste0(path.prep, "sitmap_2rad/sitmap_2rad-czechia.rds")) # 4326
 SPH_STAT.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_STAT.shp"))
 
 ############
@@ -150,7 +150,7 @@ ndop_ugc <-
 ############
 
 # zvážit jiný filtr garance?
-ndop.ff <- ndop_ugc(
+ndop <- ndop_ugc(
   years_range = list(from = paste0(min(ndop.fs$years), "-01-01"), to = paste0(max(ndop.fs$years), "-12-31")),
   season_months_range = list(from = min(ndop.fs$months), to = max(ndop.fs$months)),
   import_path_ndop = ndop.csv.path,
@@ -158,146 +158,199 @@ ndop.ff <- ndop_ugc(
   presicion = ndop.fs$precision
 )
 
-
-# ndop.ff$AUTOR %<>% as.factor
-ndop.ff %<>% filter(KAT_TAX == "Ptáci")
+ndop.orig <- ndop
+# ndop <- ndop.orig
+# ndop$AUTOR %<>% as.factor
+ndop %<>% filter(KAT_TAX == "Ptáci")
+# záloha původních autorských jmen pro kontrolu
+ndop %<>% mutate(AUTOR.orig = AUTOR)
 
 # odstraním diakritiku a převedu na malá písmena
-ndop.ff %<>% mutate(AUTOR = tolower(stri_trans_general(str = AUTOR, id = "Latin-ASCII")))
-ndop.ff %<>% mutate(AUTOR = str_replace(AUTOR, "\\.", "\\. "))
+ndop %<>% mutate(AUTOR = tolower(stri_trans_general(str = AUTOR, id = "Latin-ASCII")))
+ndop %<>% mutate(AUTOR = str_replace(AUTOR, "\\.", "\\. "))
+ndop %<>% mutate(AUTOR = trimws(AUTOR))
 
-ndop.ff <- droplevels(ndop.ff)
+ndop <- droplevels(ndop)
 
 
-au.base <- unique(as.vector(unlist(ndop.ff$AUTOR)))
+au.base <- unique(trimws(as.vector(unlist(ndop$AUTOR))))
 length(au.base)
 ## nebudu dělat explode (čárkou) více spoluautorů - dohromady mohou mít jako tým jiné určovací schopnosti, které může jednotlivý autor postrádat a tím bych mohl individuálnímu autoru přiřadit druhy, které sám nepozná
 # AUTOR.unique <- unique(trimws(unlist(strsplit(as.vector(unlist(au.base)), "[,]"))))
 # length(AUTOR.unique)
 au.base.one <- au.base[stri_count_fixed(au.base, " ") == 0]
 print(au.base.one)
-write.csv(au.base.one, file = paste0(path.wd.prep, "autors-check-single-remove.csv"), row.names = FALSE)
+write.csv(au.base.one, file = paste0(path.ndop, "autors-check-single-remove.csv"), row.names = FALSE)
 # ponechat jen autory dvou- a víceslovné (u jednoslovných hrozí zgroupování nepříslušných autorů podle křestního jména a nemusí být důvěryhodné)
 au.base.more <- au.base[stri_count_fixed(au.base, " ") > 0]
 
 # dofiltr podezřelých a problematických autorů
-au.base.more <- au.base.more[!str_detect(au.base.more, "anonym|krouzkovaci stanice")]
-length(au.base.more)
-write.csv(au.base.more, file = paste0(path.wd.prep, "autors-check.csv"), row.names = FALSE)
+au.bad <- au.base.more[str_detect(au.base.more, "anonym|krouzkovaci stanice")]
+print(au.bad)
+write.csv(au.bad, file = paste0(path.ndop, "autors-check-bad-remove.csv"), row.names = FALSE)
 
-nrow(ndop.ff) # 425933
-saveRDS(ndop.ff, paste0(path.wd.prep, "ndop.ff.rds"))
-
-
-# pouze víceslovní autoři
-ndop.ff.au.more <- ndop.ff %>% filter(AUTOR %in% au.base.more)
-nrow(ndop.ff.au.more) # 425008
+write.csv(au.base.more, file = paste0(path.ndop, "autors-check-good.csv"), row.names = FALSE)
 
 
-# počet nálezů na autora
-ndop.ff.au.more.occs <- ndop.ff.au.more %>%
-  group_by(AUTOR) %>%
-  summarise(occs = n_distinct(ID_NALEZ)) %>%
-  arrange(desc(occs))
-saveRDS(ndop.ff.au.more.occs, paste0(path.wd.prep, "ndop.ff.au.more.occs.rds"))
-
-
-# počet druhů na autora
-ndop.ff.au.more.sps <- ndop.ff.au.more %>%
-  group_by(AUTOR) %>%
-  summarise(sps = n_distinct(DRUH)) %>%
-  arrange(desc(sps))
-saveRDS(ndop.ff.au.more.sps, paste0(path.wd.prep, "ndop.ff.au.more.sps.rds"))
-
-
-# boxplot(ndop.ff.au.more.occs$occs)
-# boxplot(ndop.ff.au.more.sps$sps)
-
-# ggplot(ndop.ff.au.more.occs, aes(y = occs)) +
-#   geom_boxplot() +
-#   scale_y_log10()
-
-# ggplot(ndop.ff.au.more.occs, aes(x = occs)) +
-#   geom_histogram() +
-#   scale_x_log10()
-
-
-# koreluje počet druhů s počtem nálezů (per autor?)
-ndop.occsXsps <- ndop.ff.au.more.occs %>% left_join(ndop.ff.au.more.sps, by = "AUTOR")
-
-# # Default scatter plot
-# sp <- ggplot(ndop.occsXsps, aes(x = occs, y = sps)) +
-#   geom_point()
-# sp + scale_x_continuous(trans = "log10") + scale_y_continuous(trans = "log10")
+ndop %<>% mutate(AUTOR0 = ifelse(stri_count_fixed(AUTOR, " ") == 0, 1, ifelse(str_detect(AUTOR, "anonym|krouzkovaci stanice"), 2, 0)))
 
 
 
 # souřadnice na SF
-ndop.ff.au.more.sf <- ndop.ff.au.more %>% st_as_sf(coords = c("X", "Y"), crs = 5514)
-ndop.ff.au.more.sf %<>% st_transform(st_crs(4326))
+ndop %<>% st_as_sf(coords = c("X", "Y"), crs = 5514)
+ndop %<>% st_transform(st_crs(4326))
+ndop %<>% mutate("X" = st_coordinates(geometry)[, 1], "Y" = st_coordinates(geometry)[, 2])
+
 
 # namapování nálezů na POLE
-ndop.ff.au.more.sf.POLE <- sitmap_2rad.czechia %>% st_join(ndop.ff.au.more.sf)
-ndop.ff.au.more.sf.POLE %<>% filter(!is.na(ID_NALEZ))
+ndop.POLE <- sitmap_2rad.czechia %>% st_join(ndop)
+ndop.POLE %<>% filter(!is.na(ID_NALEZ))
+ndop.POLE.join <- as_tibble(ndop.POLE %>% dplyr::select(POLE, ID_NALEZ)) %>% dplyr::select(-geometry)
+
+ndop %<>% left_join(ndop.POLE.join, by = "ID_NALEZ")
+
+ndop %<>% filter(AUTOR0 == 0) # dálě pracuju jen s neproblematickými názvy autorů
+nrow(ndop) # 425933
+
+saveRDS(ndop, paste0(path.ndop, "ndop.rds"))
+saveRDS(ndop.POLE, paste0(path.ndop, "ndop.POLE.rds"))
+
+#####################
+# základní statistiky
+#####################
+ndop.stat <- as_tibble(ndop) %>% dplyr::select(-geometry) # pro výpočty je rychlejší udělat z toho normální tibble bez geometrie (sfc)
+ID_NALEZ.total <- nrow(ndop.stat)
+DRUH.total <- length(unique(unlist((ndop.stat$DRUH))))
+POLE.total <- length(unique(unlist((ndop.stat$POLE))))
+ndop.stat.res <- ndop.stat %>%
+  group_by(AUTOR) %>%
+  summarise(
+    ID_NALEZ.n = n_distinct(ID_NALEZ),
+    ID_NALEZ.pct = n_distinct(ID_NALEZ) / ID_NALEZ.total * 100,
+    DRUH.n = n_distinct(DRUH),
+    DRUH.pct = n_distinct(DRUH) / DRUH.total * 100,
+    POLE.n = n_distinct(POLE),
+    POLE.pct = n_distinct(POLE) / POLE.total * 100
+  ) %>%
+  arrange(desc(ID_NALEZ.n))
+
+saveRDS(ndop.stat.res, paste0(path.ndop, "ndop.stat.res.rds"))
+write.csv(ndop.stat.res, file = paste0(path.ndop, "ndop.stat.res.csv"), row.names = FALSE)
+
+# generování přehledových graf;
+options(scipen = 999)
+ndop.stat.res.boxplots <- ndop.stat.res %>% dplyr::select(-AUTOR)
+
+# nálezy
+ndop.stat.res.boxplots %<>% arrange(desc(ID_NALEZ.n))
+png(paste0(path.ndop, "observers-ID_NALEZ.png"), width = 1000)
+par(mfrow = c(1, 2))
+plot(cumsum(ndop.stat.res.boxplots$ID_NALEZ.pct), log = "x", main = "observers contribution to NDOP by occurrences", xlab = "observers ordered by activity (most -> less occurrences) [log10]", ylab = "cumsum occurrences [%]")
+grid(NULL, NULL, lty = 6)
+plot(cumsum(ndop.stat.res.boxplots$ID_NALEZ.n), log = "x", main = "observers contribution to NDOP by occurrences", xlab = "observers ordered by activity (most -> less occurrences) [log10]", ylab = "cumsum occurrences")
+grid(NULL, NULL, lty = 6)
+dev.off()
 
 
-saveRDS(ndop.ff.au.more.sf, paste0(path.wd.prep, "ndop.ff.au.more.sf.rds"))
-saveRDS(ndop.ff.au.more.sf.POLE, paste0(path.wd.prep, "ndop.ff.au.more.sf.POLE.rds"))
+# druhy (0)
+png(paste0(path.ndop, "observers-DRUH-ordered-ID_NALEZ.png"), width = 1000)
+par(mfrow = c(1, 2))
+plot(ndop.stat.res.boxplots$DRUH.n, log = "x", main = "observers contribution to NDOP by species", xlab = "observers ordered by activity (most -> less occurrences) [log10]", ylab = "sum species")
+grid(NULL, NULL, lty = 6)
+plot(ndop.stat.res.boxplots$DRUH.pct, log = "x", main = "observers contribution to NDOP by species", xlab = "observers ordered by activity (most -> less occurrences) [log10]", ylab = "sum species [%]")
+grid(NULL, NULL, lty = 6)
+dev.off()
+
+
+# druhy
+ndop.stat.res.boxplots %<>% arrange(desc(DRUH.n))
+png(paste0(path.ndop, "observers-DRUH.png"), width = 1000)
+par(mfrow = c(1, 2))
+plot(ndop.stat.res.boxplots$DRUH.n, log = "x", main = "observers contribution to NDOP by species", xlab = "observers ordered by activity (most -> less species) [log10]", ylab = "sum species")
+grid(NULL, NULL, lty = 6)
+plot(ndop.stat.res.boxplots$DRUH.pct, log = "x", main = "observers contribution to NDOP by species", xlab = "observers ordered by activity (most -> less species) [log10]", ylab = "sum species [%]")
+grid(NULL, NULL, lty = 6)
+dev.off()
+
+
+# ndop.stat.res.boxplots %<>%   arrange(desc(DRUH.n))
+ndop.stat.res.boxplots %<>% arrange(desc(POLE.n))
+png(paste0(path.ndop, "observers-POLE.png"), width = 1000)
+par(mfrow = c(1, 2))
+plot(ndop.stat.res.boxplots$POLE.n, log = "x", main = "observers contribution to NDOP by POLE", xlab = "observers ordered by activity (most -> less POLE) [log10]", ylab = "sum POLE")
+grid(NULL, NULL, lty = 6)
+plot(ndop.stat.res.boxplots$POLE.pct, log = "x", main = "observers contribution to NDOP by POLE", xlab = "observers ordered by activity (most -> less POLE) [log10]", ylab = "sum POLE [%]")
+grid(NULL, NULL, lty = 6)
+dev.off()
+
+
+# koreluje počet druhů s počtem nálezů (per autor?)
+png(paste0(path.ndop, "species-occurrences.png"), width = 500)
+ndop.stat.res.boxplots %<>% arrange(desc(ID_NALEZ.n))
+plot(ndop.stat.res.boxplots$DRUH.n ~ ndop.stat.res.boxplots$ID_NALEZ.n, log = "x", main = "species ~ occurrences (per observer)", xlab = "occurrences  [log10]", ylab = "species")
+grid(NULL, NULL, lty = 6)
+dev.off()
+
+
+#
+# přehledové mapy
+#
+
+# počet druhů na pole
+ndop.POLE.join.sp <- as_tibble(ndop.POLE %>% dplyr::select(POLE, DRUH)) %>% dplyr::select(-geometry)
+ndop.POLE.join.sp %<>%
+  group_by(POLE) %>% summarise(
+    DRUH.n = n_distinct(DRUH)
+  )
+ndop.POLE.join.sp %<>% left_join(sitmap_2rad.czechia, by = "POLE") %>% ungroup()
+png(paste0(path.ndop, "map-species-per-POLE.png"), width = 1000)
+plot(st_as_sf(ndop.POLE.join.sp) %>% dplyr::select(DRUH.n), breaks = unname(quantile(unique(as.vector(unlist(as_tibble(ndop.POLE.join.sp) %>% dplyr::select(DRUH.n, -geometry)))))))
+dev.off()
+
+# počet nálezů na pole
+ndop.POLE.join.occs <- as_tibble(ndop.POLE %>% dplyr::select(POLE, ID_NALEZ)) %>% dplyr::select(-geometry)
+ndop.POLE.join.occs %<>%
+  group_by(POLE) %>% summarise(
+    ID_NALEZ.n = n_distinct(ID_NALEZ)
+  )
+ndop.POLE.join.occs %<>% left_join(sitmap_2rad.czechia, by = "POLE")
+png(paste0(path.ndop, "map-occs-per-POLE.png"), width = 1000)
+plot(st_as_sf(ndop.POLE.join.occs) %>% dplyr::select(ID_NALEZ.n), breaks = unname(quantile(unique(as.vector(unlist(as_tibble(ndop.POLE.join.occs) %>% dplyr::select(ID_NALEZ.n, -geometry)))))))
+dev.off()
+
+# počet autorů na pole
+ndop.POLE.join.au <- as_tibble(ndop.POLE %>% dplyr::select(POLE, AUTOR)) %>% dplyr::select(-geometry)
+ndop.POLE.join.au %<>%
+  group_by(POLE) %>% summarise(
+    AUTOR.n = n_distinct(AUTOR)
+  )
+ndop.POLE.join.au %<>% left_join(sitmap_2rad.czechia, by = "POLE")
+png(paste0(path.ndop, "map-observers-per-POLE.png"), width = 1000)
+plot(st_as_sf(ndop.POLE.join.au) %>% dplyr::select(AUTOR.n), breaks = unname(quantile(unique(as.vector(unlist(as_tibble(ndop.POLE.join.au) %>% dplyr::select(AUTOR.n, -geometry)))))))
+dev.off()
 
 
 
-# per pixel - unikátní hodnoty druhů na pixel a autora
-ndop.ff.au.more.sf.POLE.pp <- ndop.ff.au.more.sf.POLE %>%
-  group_by(DRUH, POLE, AUTOR) %>%
-  slice_head(n = 1)
-nrow(ndop.ff.au.more.sf.POLE.pp) # 210539
-saveRDS(ndop.ff.au.more.sf.POLE.pp, paste0(path.wd.prep, "ndop.ff.au.more.sf.POLE.pp.rds"))
-
-# jen body (centroidy pixelů)
-ndop.ff.au.more.sf.POLE.pp.c <- ndop.ff.au.more.sf.POLE.pp %>% st_centroid()
-saveRDS(ndop.ff.au.more.sf.POLE.pp.c, paste0(path.wd.prep, "ndop.ff.au.more.sf.POLE.pp.c.rds"))
 
 
-# per pixel unikátní druhy
-ndop.ff.au.more.sf.POLE.pp.sp <- ndop.ff.au.more.sf.POLE %>%
-  group_by(DRUH, POLE) %>%
-  slice_head(n = 1)
-nrow(ndop.ff.au.more.sf.POLE.pp.sp) #
-saveRDS(ndop.ff.au.more.sf.POLE.pp.sp, paste0(path.wd.prep, "ndop.ff.au.more.sf.POLE.pp.sp.rds"))
-
-
-
-# filtrace problematických druhů (malý počet nálezů, název)
-ndop.ff.au.more.sf.POLE.pp.sp.count <- ndop.ff.au.more.sf.POLE.pp.sp %>%
-  st_drop_geometry() %>%
-  group_by(DRUH) %>%
-  count(DRUH) %>%
-  arrange(desc(n))
-saveRDS(ndop.ff.au.more.sf.POLE.pp.sp.count, paste0(path.wd.prep, "ndop.ff.au.more.sf.POLE.pp.sp.count.rds"))
-
-ndop.sp.selected <- ndop.ff.au.more.sf.POLE.pp.sp.count %>%
-  filter(n >= 10) %>%
-  filter(!str_detect(DRUH, "×")) %>%
-  filter(!str_detect(DRUH, "/")) %>%
-  filter(!str_detect(DRUH, "sp\\."))
-saveRDS(ndop.sp.selected, paste0(path.wd.prep, "ndop.sp.selected.rds"))
 
 
 #
 # vizualizace map TGOB (per pixel occs) a presencí
 #
 SPH_STAT.source.s <- st_simplify(SPH_STAT.source, preserveTopology = FALSE, dTolerance = 0.001)
-# druhy <- unique(as.vector(unlist(ndop.ff.au.more.sf.POLE$DRUH)))
-druhy <- unique(as.vector(unlist(ndop.sp.selected$DRUH)))
+# druhy <- unique(as.vector(unlist(ndop.sf.POLE$DRUH)))
+druhy <- unique(as.vector(unlist(ndop$DRUH)))
 first <- TRUE
 for (druh in druhy) {
   print(druh)
-  pres <- ndop.ff.au.more.sf.POLE.pp.c %>% filter(DRUH == druh)
+  pres <- ndop.POLE %>% filter(DRUH == druh)
   pres.au <- unique(as.vector(unlist(pres$AUTOR)))
-  tgob <- ndop.ff.au.more.sf.POLE.pp.c %>% filter(AUTOR %in% pres.au)
+  tgob <- ndop.POLE %>% filter(AUTOR %in% pres.au)
   pres.unique <- pres %>%
     group_by(POLE) %>%
-    slice_head(n = 1)
+    slice_head(n = 1) %>%
+    st_centroid()
   tgob.unique <- tgob %>%
     group_by(POLE) %>%
     slice_head(n = 1)
@@ -306,7 +359,8 @@ for (druh in druhy) {
   tgob.count <- tgob %>%
     group_by(POLE) %>%
     mutate(pp = length(unique(ID_NALEZ))) %>%
-    slice_head(n = 1)
+    slice_head(n = 1) %>%
+    st_centroid()
   length(unique(tgob.count$POLE))
 
 
@@ -341,15 +395,15 @@ for (druh in druhy) {
       subtitle = paste0("TGOB (same species observers occs per pixel) | p:", df.temp$pu, " / bg:", df.temp$tgobu, " / a:", df.temp$authors)
     )
 
-  png(paste0(path.wd.prep, "tgob/tgob-", str_replace_all(druh, "[\\/\\:]", "_"), ".png"), width = 1200, height = 700)
+  png(paste0(path.ndop, "tgob/tgob-", str_replace_all(druh, "[\\/\\:]", "_"), ".png"), width = 1200, height = 700)
 
   print(ggpl)
   dev.off()
 }
 
 
-saveRDS(df.out, paste0(path.wd.prep, "df.out.rds"))
-write.csv(df.out, paste0(path.wd.prep, "df.out.csv"))
+saveRDS(df.out, paste0(path.ndop, "df.out.rds"))
+write.csv(df.out, paste0(path.ndop, "df.out.csv"), row.names = FALSE)
 
 # vygenerovat i mapy presencí druhu (počet) a backgroundu podle odpovídajících autorů (počty i per pixel)
 
