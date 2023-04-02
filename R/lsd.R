@@ -203,11 +203,11 @@ dev.off()
 # saveRDS(lsd, paste0(path.lsd, "overview-lsd.rds"))
 
 #
-# thinning blízkých čtverců (odstranění potenciální spatial autocorrelation)
+# thinning blízkých (hranou sousedících) čtverců (odstranění potenciální spatial autocorrelation)
 #
 sitmap_2rad.czechia.ow.df <- as.data.frame(st_coordinates(st_centroid(sitmap_2rad.czechia.ow)))[, 1:2]
 names(sitmap_2rad.czechia.ow.df) <- c("x", "y")
-lsd.thinned <- ecospat.occ.desaggregation(xy = sitmap_2rad.czechia.ow.df, min.dist = ((1 / 6) / 4) * 1.5, by = NULL)
+lsd.thinned <- ecospat.occ.desaggregation(xy = sitmap_2rad.czechia.ow.df, min.dist = ((1 / 6) / 4) * 1.1, by = NULL)
 
 lsd.thinned %<>% st_as_sf(coords = c("x", "y"), crs = 4326)
 lsd.thinned$thin <- 1
