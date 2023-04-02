@@ -267,8 +267,8 @@ length(unique(ndop$DRUH))
 #
 # synonymizace (sjednocení různé taxonomie)
 #
-ndop <- synonyms_unite(ndop, spCol = "DRUH")
-ndop.POLE <- synonyms_unite(ndop.POLE, spCol = "DRUH")
+ndop <- synonyms_unite(ndop, spCol = "DRUH") %>% st_as_sf()
+ndop.POLE <- synonyms_unite(ndop.POLE, spCol = "DRUH") %>% st_as_sf()
 
 print("NDOP po synonymizaci poddruhů:")
 nrow(ndop)
@@ -481,7 +481,7 @@ dev.off()
 #
 
 # počet druhů na pole
-ndop.POLE.join.sp <- as_tibble(ndop.POLE %>% dplyr::select(POLE, DRUH)) %>% dplyr::select(-geometry)
+ndop.POLE.join.sp <- as_tibble(ndop.POLE) %>% dplyr::select(POLE, DRUH, -geometry)
 ndop.POLE.join.sp %<>%
   group_by(POLE) %>% summarise(
     DRUH.n = n_distinct(DRUH)
@@ -492,23 +492,23 @@ plot(st_as_sf(ndop.POLE.join.sp) %>% dplyr::select(DRUH.n), breaks = unname(quan
 dev.off()
 
 # počet nálezů na pole
-ndop.POLE.join.occs <- as_tibble(ndop.POLE %>% dplyr::select(POLE, ID_NALEZ)) %>% dplyr::select(-geometry)
+ndop.POLE.join.occs <- as_tibble(ndop.POLE) %>% dplyr::select(POLE, ID_NALEZ, -geometry)
 ndop.POLE.join.occs %<>%
   group_by(POLE) %>% summarise(
     ID_NALEZ.n = n_distinct(ID_NALEZ)
   )
-ndop.POLE.join.occs %<>% left_join(sitmap_2rad.czechia, by = "POLE")
+ndop.POLE.join.occs %<>% left_join(sitmap_2rad.czechia, by = "POLE") %>% ungroup()
 png(paste0(path.ndop, "map-occs-per-POLE.png"), width = 1000)
 plot(st_as_sf(ndop.POLE.join.occs) %>% dplyr::select(ID_NALEZ.n), breaks = unname(quantile(unique(as.vector(unlist(as_tibble(ndop.POLE.join.occs) %>% dplyr::select(ID_NALEZ.n, -geometry)))))))
 dev.off()
 
 # počet autorů na pole
-ndop.POLE.join.au <- as_tibble(ndop.POLE %>% dplyr::select(POLE, AUTOR)) %>% dplyr::select(-geometry)
+ndop.POLE.join.au <- as_tibble(ndop.POLE) %>% dplyr::select(POLE, AUTOR, -geometry)
 ndop.POLE.join.au %<>%
   group_by(POLE) %>% summarise(
     AUTOR.n = n_distinct(AUTOR)
   )
-ndop.POLE.join.au %<>% left_join(sitmap_2rad.czechia, by = "POLE")
+ndop.POLE.join.au %<>% left_join(sitmap_2rad.czechia, by = "POLE") %>% ungroup()
 png(paste0(path.ndop, "map-observers-per-POLE.png"), width = 1000)
 plot(st_as_sf(ndop.POLE.join.au) %>% dplyr::select(AUTOR.n), breaks = unname(quantile(unique(as.vector(unlist(as_tibble(ndop.POLE.join.au) %>% dplyr::select(AUTOR.n, -geometry)))))))
 dev.off()

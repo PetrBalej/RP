@@ -113,7 +113,7 @@ length(unique(lsd$TaxonNameLAT))
 #
 # synonymizace (sjednocení různé taxonomie)
 #
-lsd <- synonyms_unite(lsd, spCol = "TaxonNameLAT")
+lsd <- synonyms_unite(lsd, spCol = "TaxonNameLAT") %>% st_as_sf()
 print("NDOP po synonymizaci poddruhů:")
 nrow(lsd)
 length(unique(lsd$TaxonNameLAT))
