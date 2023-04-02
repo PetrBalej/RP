@@ -113,7 +113,7 @@ length(unique(lsd$TaxonNameLAT))
 #
 # synonymizace (sjednocení různé taxonomie)
 #
-lsd <- synonyms_unite(lsd, spCol = "TaxonNameLAT") %>% st_as_sf()
+lsd <- synonyms_unite(lsd, spCol = "TaxonNameLAT")
 print("NDOP po synonymizaci poddruhů:")
 nrow(lsd)
 length(unique(lsd$TaxonNameLAT))
@@ -265,6 +265,8 @@ for (sp in lsd.species) {
 
 lsd.pa.polygons <- st_as_sf(lsd.pa)
 saveRDS(lsd.pa.polygons, paste0(path.lsd, "lsd.pa.polygons.rds"))
+st_write(lsd.pa.polygons, paste0(path.lsd, "lsd.pa.polygons.shp"))
+
 lsd.pa.centroids <- lsd.pa.polygons
 lsd.pa.centroids <- st_as_sf(st_centroid(lsd.pa.polygons))
 saveRDS(lsd.pa.centroids, paste0(path.lsd, "lsd.pa.centroids.rds"))
