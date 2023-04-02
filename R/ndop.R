@@ -232,6 +232,9 @@ length(unique(ndop$DRUH))
 saveRDS(ndop, paste0(path.ndop, "ndop.rds"))
 saveRDS(ndop.POLE, paste0(path.ndop, "ndop.POLE.rds"))
 
+# záloha dále pro topX autorů a druhů
+ndop.tgob <- ndop
+ndop.POLE.tgob <- ndop.POLE
 #######################################################################################################################################################################################
 
 #
@@ -354,6 +357,26 @@ mtext("cumsum ID_NALEZ [%]", side = 4, line = 3)
 dev.off()
 
 
+# nej autoři
+ndop.stat.res.topAUTOR <- ndop.stat.res %>%
+  arrange(desc(ID_NALEZ.n)) %>%
+  slice_head(n = 100)
+saveRDS(ndop.stat.res.topAUTOR, paste0(path.ndop, "ndop.stat.res.topAUTOR.rds"))
+write.csv(ndop.stat.res.topAUTOR, paste0(path.ndop, "ndop.stat.res.topAUTOR.csv"), row.names = FALSE)
+
+# 100
+ndop.topAUTOR100 <- ndop.tgob %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
+ndop.POLE.topAUTOR100 <- ndop.POLE.tgob %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
+saveRDS(ndop.topAUTOR100, paste0(path.ndop, "ndop.topAUTOR100.rds"))
+saveRDS(ndop.POLE.topAUTOR100, paste0(path.ndop, "ndop.POLE.topAUTOR100.rds"))
+
+# 10
+ndop.stat.res.topAUTOR %<>% slice_head(n = 10)
+ndop.topAUTOR10 <- ndop.tgob %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
+ndop.POLE.topAUTOR10 <- ndop.POLE.tgob %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
+saveRDS(ndop.topAUTOR10, paste0(path.ndop, "ndop.topAUTOR10.rds"))
+saveRDS(ndop.POLE.topAUTOR10, paste0(path.ndop, "ndop.POLE.topAUTOR10.rds"))
+
 # druhy (0)
 png(paste0(path.ndop, "AUTOR-observers-DRUH-ordered-ID_NALEZ.png"), width = 520, height = 500)
 par(mar = c(4, 4, 2, 4))
@@ -426,6 +449,25 @@ axis(side = 4, at = pretty(range(cumsum(ndop.stat.res.boxplots.sp$ID_NALEZ.pct))
 mtext("cumsum ID_NALEZ [%]", side = 4, line = 3)
 dev.off()
 
+# nej druhy
+ndop.stat.res.sp.topDRUH <- ndop.stat.res.sp %>%
+  arrange(desc(ID_NALEZ.n)) %>%
+  slice_head(n = 50)
+saveRDS(ndop.stat.res.sp.topDRUH, paste0(path.ndop, "ndop.stat.res.sp.topDRUH.rds"))
+write.csv(ndop.stat.res.sp.topDRUH, paste0(path.ndop, "ndop.stat.res.sp.topDRUH.csv"), row.names = FALSE)
+
+# 100
+ndop.topDRUH50 <- ndop.tgob %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
+ndop.POLE.topDRUH50 <- ndop.POLE.tgob %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
+saveRDS(ndop.topDRUH50, paste0(path.ndop, "ndop.topDRUH50.rds"))
+saveRDS(ndop.POLE.topDRUH50, paste0(path.ndop, "ndop.POLE.topDRUH50.rds"))
+
+# 10
+ndop.stat.res.sp.topDRUH %<>% slice_head(n = 10)
+ndop.topDRUH10 <- ndop.tgob %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
+ndop.POLE.topDRUH10 <- ndop.POLE.tgob %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
+saveRDS(ndop.topDRUH10, paste0(path.ndop, "ndop.topDRUH10.rds"))
+saveRDS(ndop.POLE.topDRUH10, paste0(path.ndop, "ndop.POLE.topDRUH10.rds"))
 
 # autoři (0)
 png(paste0(path.ndop, "DRUH-observers-AUTOR-ordered-ID_NALEZ.png"), width = 520, height = 500)
