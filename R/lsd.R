@@ -275,6 +275,7 @@ lsd.pa.min <- as_tibble(lsd.pa.centroids) %>%
   summarize(np = sum(presence), na = sum(presence == 0)) %>%
   filter(np >= lsd.fs$minPA & na >= lsd.fs$minPA)
 saveRDS(lsd.pa.min, paste0(path.lsd, "lsd.pa.min.rds"))
+write.csv(lsd.pa.min, file = paste0(path.lsd, "lsd.pa.min.csv"), row.names = FALSE)
 
 # + remove spatialy autocorrelated squares - geographically/environmentally
 # alespoň reprezentativnost vůči altitude a landcoveru?
