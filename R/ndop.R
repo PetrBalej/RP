@@ -31,8 +31,8 @@ path.wd <- paste0(gcfl(), "/")
 setwd(path.wd)
 path.data <- paste0(path.wd, "../../projects-data/")
 path.prep <- paste0(path.wd, "../../dataPrep/")
-# path.rgee <- paste0(path.wd, "../../../rgee/") # samsung500ntfs # paste0(path.expand("~"), "/Downloads/rgee2/rgee")
-# source(paste0(path.rgee, "R/export_raster/functions.R"))
+path.rgee <- paste0(path.wd, "../../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
+source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.ndop <- paste0(path.prep, "ndop/")
 
 
@@ -51,7 +51,7 @@ ndop.fs <- list(
   "version" = "v1",
   "authorsFilter" = c(0),
   "filterProblematicSpecies" = c("×", "/", "sp\\.", "f\\. domestica", "sensu lato"),
-  "minPres" = 10
+  "minPres" = 10 # aplikován pouze pro generování mapek SSOS
 )
 
 
@@ -182,8 +182,6 @@ ndop %<>% mutate(AUTOR = tolower(stri_trans_general(str = AUTOR, id = "Latin-ASC
 ndop %<>% mutate(AUTOR = str_replace(AUTOR, "\\.", "\\. "))
 ndop %<>% mutate(AUTOR = trimws(AUTOR))
 
-ndop <- droplevels(ndop)
-
 
 au.base <- unique(trimws(as.vector(unlist(ndop$AUTOR))))
 length(au.base)
@@ -226,11 +224,15 @@ ndop.POLE %<>% filter(AUTOR0 %in% ndop.fs$authorsFilter) # dálě pracuju jen s 
 print("NDOP základ:")
 nrow(ndop) # 425933
 nrow(ndop.POLE)
+length(unique(ndop$DRUH))
+
 #
 # pro celkové SSOS úsilí (kernel smoothing) má význam mít vše
 #
 saveRDS(ndop, paste0(path.ndop, "ndop.rds"))
 saveRDS(ndop.POLE, paste0(path.ndop, "ndop.POLE.rds"))
+
+#######################################################################################################################################################################################
 
 #
 # odstraňuji problematické druhy, pro vstup jako presence jednotlivých druhů do SDM
@@ -248,7 +250,31 @@ if (length(ndop.fs$filterProblematicSpecies) > 0) {
   print("NDOP po odstranění problematických druhů:")
   nrow(ndop)
   nrow(ndop.POLE)
+  length(unique(ndop$DRUH))
 }
+
+
+#
+# sjednocení poddruhů na druhy (nerozlišuju, nemělo by mít význam z hlediska nároku různých poddruhů?)
+#
+ndop %<>% rowwise() %>% mutate(DRUH = paste(strsplit(DRUH, " ")[[1]][1:2], collapse = " "))
+ndop.POLE %<>% rowwise() %>% mutate(DRUH = paste(strsplit(DRUH, " ")[[1]][1:2], collapse = " "))
+print("NDOP po downgrade poddruhů:")
+nrow(ndop)
+nrow(ndop.POLE)
+length(unique(ndop$DRUH))
+
+#
+# synonymizace (sjednocení různé taxonomie)
+#
+ndop <- synonyms_unite(ndop, spCol = "DRUH")
+ndop.POLE <- synonyms_unite(ndop.POLE, spCol = "DRUH")
+
+print("NDOP po synonymizaci poddruhů:")
+nrow(ndop)
+nrow(ndop.POLE)
+length(unique(ndop$DRUH))
+
 saveRDS(ndop, paste0(path.ndop, "ndopP.rds"))
 saveRDS(ndop.POLE, paste0(path.ndop, "ndopP.POLE.rds"))
 
