@@ -46,7 +46,13 @@ SPH_STAT.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_STAT.
 ############
 # settings
 ############
-ndop.fs <- list("months" = c(4:6), "years" = c(2019:2022), "precision" = 1000, "version" = "v1", "authorsFilter" = c(0))
+ndop.fs <- list(
+  "months" = c(4:6), "years" = c(2019:2022), "precision" = 1000,
+  "version" = "v1",
+  "authorsFilter" = c(0),
+  "filterProblematicSpecies" = c("×", "/", "sp\\.", "f\\. domestica", "sensu lato"),
+  "minPres" = 10
+)
 
 
 st_crs(SPH_STAT.source) <- 4326
@@ -162,6 +168,12 @@ ndop.orig <- ndop
 # ndop <- ndop.orig
 # ndop$AUTOR %<>% as.factor
 ndop %<>% filter(KAT_TAX == "Ptáci")
+
+
+# sjednocuji (ať zbytečně neodstraňuji...)
+ndop %<>% mutate(DRUH == ifelse(DRUH == "Acanthis flammea/cabaret", "Acanthis flammea", DRUH))
+
+
 # záloha původních autorských jmen pro kontrolu
 ndop %<>% mutate(AUTOR.orig = AUTOR)
 
@@ -211,10 +223,34 @@ ndop %<>% left_join(ndop.POLE.join, by = "ID_NALEZ")
 
 ndop %<>% filter(AUTOR0 %in% ndop.fs$authorsFilter) # dálě pracuju jen s neproblematickými názvy autorů
 ndop.POLE %<>% filter(AUTOR0 %in% ndop.fs$authorsFilter) # dálě pracuju jen s neproblematickými názvy autorů
+print("NDOP základ:")
 nrow(ndop) # 425933
-
+nrow(ndop.POLE)
+#
+# pro celkové SSOS úsilí (kernel smoothing) má význam mít vše
+#
 saveRDS(ndop, paste0(path.ndop, "ndop.rds"))
 saveRDS(ndop.POLE, paste0(path.ndop, "ndop.POLE.rds"))
+
+#
+# odstraňuji problematické druhy, pro vstup jako presence jednotlivých druhů do SDM
+#
+ndop %<>% filter(DRUH != "Luscinia svecica svecica")
+ndop.POLE %<>% filter(DRUH != "Luscinia svecica svecica")
+if (length(ndop.fs$filterProblematicSpecies) > 0) {
+  # filtrace problematických druhů (název)
+  for (bad in ndop.fs$filterProblematicSpecies) {
+    ndop %<>%
+      filter(!str_detect(DRUH, bad))
+    ndop.POLE %<>%
+      filter(!str_detect(DRUH, bad))
+  }
+  print("NDOP po odstranění problematických druhů:")
+  nrow(ndop)
+  nrow(ndop.POLE)
+}
+saveRDS(ndop, paste0(path.ndop, "ndopP.rds"))
+saveRDS(ndop.POLE, paste0(path.ndop, "ndopP.POLE.rds"))
 
 #####################
 # základní statistiky
@@ -468,7 +504,6 @@ SPH_STAT.source.s <- st_simplify(SPH_STAT.source, preserveTopology = FALSE, dTol
 druhy <- unique(as.vector(unlist(ndop$DRUH)))
 first <- TRUE
 for (druh in druhy) {
-  print(druh)
   pres <- ndop.POLE %>% filter(DRUH == druh)
   pres.au <- unique(as.vector(unlist(pres$AUTOR)))
   ssos <- ndop.POLE %>% filter(AUTOR %in% pres.au)
@@ -476,6 +511,14 @@ for (druh in druhy) {
     group_by(POLE) %>%
     slice_head(n = 1) %>%
     st_centroid()
+
+  if (nrow(pres.unique) < ndop.fs$minPres) {
+    # negeneruju zbytečně mapky s druhy s malým počtem presencí...
+    print("přeskakuju (limit minPres):")
+    print(druh)
+    next
+  }
+  print(druh)
 
   ssos.unique <- ssos %>%
     group_by(POLE) %>%
