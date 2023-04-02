@@ -237,50 +237,75 @@ ndop.stat.res <- ndop.stat %>%
 saveRDS(ndop.stat.res, paste0(path.ndop, "ndop.stat.res.rds"))
 write.csv(ndop.stat.res, file = paste0(path.ndop, "ndop.stat.res.csv"), row.names = FALSE)
 
-# generování přehledových graf;
+#
+# generování přehledových grafů
+#
 options(scipen = 999)
 ndop.stat.res.boxplots <- ndop.stat.res %>% dplyr::select(-AUTOR)
 
 # nálezy
 ndop.stat.res.boxplots %<>% arrange(desc(ID_NALEZ.n))
-png(paste0(path.ndop, "observers-ID_NALEZ.png"), width = 1000)
-par(mfrow = c(1, 2))
-plot(cumsum(ndop.stat.res.boxplots$ID_NALEZ.pct), log = "x", main = "observers contribution to NDOP by occurrences", xlab = "observers ordered by activity (most -> less occurrences) [log10]", ylab = "cumsum occurrences [%]")
+png(paste0(path.ndop, "observers-ID_NALEZ.png"), width = 500, height = 500)
+par(mar = c(4, 4, 2, 4))
+plot(ndop.stat.res.boxplots$ID_NALEZ.n, log = "x", main = "observers contribution to NDOP by ID_NALEZ", xlab = "observers ordered by activity (most -> less ID_NALEZ) [log10]", ylab = "sum ID_NALEZ")
 grid(NULL, NULL, lty = 6)
-plot(cumsum(ndop.stat.res.boxplots$ID_NALEZ.n), log = "x", main = "observers contribution to NDOP by occurrences", xlab = "observers ordered by activity (most -> less occurrences) [log10]", ylab = "cumsum occurrences")
+par(new = TRUE)
+plot(ndop.stat.res.boxplots$ID_NALEZ.pct, log = "x", axes = FALSE, xlab = "", ylab = "") # negeneruju popisky os
 grid(NULL, NULL, lty = 6)
+axis(side = 4, at = pretty(range(ndop.stat.res.boxplots$ID_NALEZ.pct))) # sekundární y osa
+mtext("sum ID_NALEZ [%]", side = 4, line = 3)
+dev.off()
+
+# nálezy cumsum
+ndop.stat.res.boxplots %<>% arrange(desc(ID_NALEZ.n))
+png(paste0(path.ndop, "observers-ID_NALEZ-cumsum.png"), width = 500, height = 500)
+par(mar = c(4, 4, 2, 4))
+plot(cumsum(ndop.stat.res.boxplots$ID_NALEZ.n), log = "x", main = "observers contribution to NDOP by ID_NALEZ", xlab = "observers ordered by activity (most -> less ID_NALEZ) [log10]", ylab = "cumsum ID_NALEZ")
+grid(NULL, NULL, lty = 6)
+par(new = TRUE)
+plot(cumsum(ndop.stat.res.boxplots$ID_NALEZ.pct), log = "x", axes = FALSE, xlab = "", ylab = "") # negeneruju popisky os
+grid(NULL, NULL, lty = 6)
+axis(side = 4, at = pretty(range(cumsum(ndop.stat.res.boxplots$ID_NALEZ.pct)))) # sekundární y osa
+mtext("cumsum ID_NALEZ [%]", side = 4, line = 3)
 dev.off()
 
 
 # druhy (0)
-png(paste0(path.ndop, "observers-DRUH-ordered-ID_NALEZ.png"), width = 1000)
-par(mfrow = c(1, 2))
-plot(ndop.stat.res.boxplots$DRUH.n, log = "x", main = "observers contribution to NDOP by species", xlab = "observers ordered by activity (most -> less occurrences) [log10]", ylab = "sum species")
+png(paste0(path.ndop, "observers-DRUH-ordered-ID_NALEZ.png"), width = 500, height = 500)
+par(mar = c(4, 4, 2, 4))
+plot(ndop.stat.res.boxplots$DRUH.n, log = "x", main = "observers contribution to NDOP by DRUH", xlab = "observers ordered by activity (most -> less ID_NALEZ) [log10]", ylab = "sum DRUH")
 grid(NULL, NULL, lty = 6)
-plot(ndop.stat.res.boxplots$DRUH.pct, log = "x", main = "observers contribution to NDOP by species", xlab = "observers ordered by activity (most -> less occurrences) [log10]", ylab = "sum species [%]")
+par(new = TRUE)
+plot(ndop.stat.res.boxplots$DRUH.pct, log = "x", axes = FALSE, xlab = "", ylab = "") # negeneruju popisky os
 grid(NULL, NULL, lty = 6)
+axis(side = 4, at = pretty(range(ndop.stat.res.boxplots$DRUH.pct))) # sekundární y osa
+mtext("sum DRUH [%]", side = 4, line = 3)
 dev.off()
-
 
 # druhy
 ndop.stat.res.boxplots %<>% arrange(desc(DRUH.n))
-png(paste0(path.ndop, "observers-DRUH.png"), width = 1000)
-par(mfrow = c(1, 2))
-plot(ndop.stat.res.boxplots$DRUH.n, log = "x", main = "observers contribution to NDOP by species", xlab = "observers ordered by activity (most -> less species) [log10]", ylab = "sum species")
+png(paste0(path.ndop, "observers-DRUH.png"), width = 500, height = 500)
+par(mar = c(4, 4, 2, 4))
+plot(ndop.stat.res.boxplots$DRUH.n, log = "x", main = "observers contribution to NDOP by DRUH", xlab = "observers ordered by activity (most -> less DRUH) [log10]", ylab = "sum DRUH")
 grid(NULL, NULL, lty = 6)
-plot(ndop.stat.res.boxplots$DRUH.pct, log = "x", main = "observers contribution to NDOP by species", xlab = "observers ordered by activity (most -> less species) [log10]", ylab = "sum species [%]")
+par(new = TRUE)
+plot(ndop.stat.res.boxplots$DRUH.pct, log = "x", axes = FALSE, xlab = "", ylab = "") # negeneruju popisky os
 grid(NULL, NULL, lty = 6)
+axis(side = 4, at = pretty(range(ndop.stat.res.boxplots$DRUH.pct))) # sekundární y osa
+mtext("sum DRUH [%]", side = 4, line = 3)
 dev.off()
 
-
-# ndop.stat.res.boxplots %<>%   arrange(desc(DRUH.n))
+# pole
 ndop.stat.res.boxplots %<>% arrange(desc(POLE.n))
-png(paste0(path.ndop, "observers-POLE.png"), width = 1000)
-par(mfrow = c(1, 2))
+png(paste0(path.ndop, "observers-POLE.png"), width = 500, height = 500)
+par(mar = c(4, 4, 2, 4))
 plot(ndop.stat.res.boxplots$POLE.n, log = "x", main = "observers contribution to NDOP by POLE", xlab = "observers ordered by activity (most -> less POLE) [log10]", ylab = "sum POLE")
 grid(NULL, NULL, lty = 6)
-plot(ndop.stat.res.boxplots$POLE.pct, log = "x", main = "observers contribution to NDOP by POLE", xlab = "observers ordered by activity (most -> less POLE) [log10]", ylab = "sum POLE [%]")
+par(new = TRUE)
+plot(ndop.stat.res.boxplots$POLE.pct, log = "x", axes = FALSE, xlab = "", ylab = "") # negeneruju popisky os
 grid(NULL, NULL, lty = 6)
+axis(side = 4, at = pretty(range(ndop.stat.res.boxplots$POLE.pct))) # sekundární y osa
+mtext("sum POLE [%]", side = 4, line = 3)
 dev.off()
 
 
