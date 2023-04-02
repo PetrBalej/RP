@@ -227,18 +227,18 @@ nrow(ndop.POLE)
 length(unique(ndop$DRUH))
 
 #
-# pro celkové SSOS úsilí (kernel smoothing) má význam mít vše
+# pro celkové TGOB úsilí (kernel smoothing) má význam mít vše
 #
 saveRDS(ndop, paste0(path.ndop, "ndop.rds"))
 saveRDS(ndop.POLE, paste0(path.ndop, "ndop.POLE.rds"))
 
-# záloha dále pro topX autorů a druhů
+# záloha
 ndop.tgob <- ndop
 ndop.POLE.tgob <- ndop.POLE
 #######################################################################################################################################################################################
 
 #
-# odstraňuji problematické druhy, pro vstup jako presence jednotlivých druhů do SDM
+# odstraňuji problematické druhy, pro vstup jako presence jednotlivých druhů do SDM a SSOS
 #
 ndop %<>% filter(DRUH != "Luscinia svecica svecica")
 ndop.POLE %<>% filter(DRUH != "Luscinia svecica svecica")
@@ -365,15 +365,15 @@ saveRDS(ndop.stat.res.topAUTOR, paste0(path.ndop, "ndop.stat.res.topAUTOR.rds"))
 write.csv(ndop.stat.res.topAUTOR, paste0(path.ndop, "ndop.stat.res.topAUTOR.csv"), row.names = FALSE)
 
 # 100
-ndop.topAUTOR100 <- ndop.tgob %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
-ndop.POLE.topAUTOR100 <- ndop.POLE.tgob %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
+ndop.topAUTOR100 <- ndop %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
+ndop.POLE.topAUTOR100 <- ndop.POLE %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
 saveRDS(ndop.topAUTOR100, paste0(path.ndop, "ndop.topAUTOR100.rds"))
 saveRDS(ndop.POLE.topAUTOR100, paste0(path.ndop, "ndop.POLE.topAUTOR100.rds"))
 
 # 10
 ndop.stat.res.topAUTOR %<>% slice_head(n = 10)
-ndop.topAUTOR10 <- ndop.tgob %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
-ndop.POLE.topAUTOR10 <- ndop.POLE.tgob %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
+ndop.topAUTOR10 <- ndop %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
+ndop.POLE.topAUTOR10 <- ndop.POLE %>% filter(AUTOR %in% unique(ndop.stat.res.topAUTOR$AUTOR))
 saveRDS(ndop.topAUTOR10, paste0(path.ndop, "ndop.topAUTOR10.rds"))
 saveRDS(ndop.POLE.topAUTOR10, paste0(path.ndop, "ndop.POLE.topAUTOR10.rds"))
 
@@ -456,16 +456,16 @@ ndop.stat.res.sp.topDRUH <- ndop.stat.res.sp %>%
 saveRDS(ndop.stat.res.sp.topDRUH, paste0(path.ndop, "ndop.stat.res.sp.topDRUH.rds"))
 write.csv(ndop.stat.res.sp.topDRUH, paste0(path.ndop, "ndop.stat.res.sp.topDRUH.csv"), row.names = FALSE)
 
-# 100
-ndop.topDRUH50 <- ndop.tgob %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
-ndop.POLE.topDRUH50 <- ndop.POLE.tgob %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
+# 50
+ndop.topDRUH50 <- ndop %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
+ndop.POLE.topDRUH50 <- ndop.POLE %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
 saveRDS(ndop.topDRUH50, paste0(path.ndop, "ndop.topDRUH50.rds"))
 saveRDS(ndop.POLE.topDRUH50, paste0(path.ndop, "ndop.POLE.topDRUH50.rds"))
 
 # 10
 ndop.stat.res.sp.topDRUH %<>% slice_head(n = 10)
-ndop.topDRUH10 <- ndop.tgob %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
-ndop.POLE.topDRUH10 <- ndop.POLE.tgob %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
+ndop.topDRUH10 <- ndop %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
+ndop.POLE.topDRUH10 <- ndop.POLE %>% filter(DRUH %in% unique(ndop.stat.res.sp.topDRUH$DRUH))
 saveRDS(ndop.topDRUH10, paste0(path.ndop, "ndop.topDRUH10.rds"))
 saveRDS(ndop.POLE.topDRUH10, paste0(path.ndop, "ndop.POLE.topDRUH10.rds"))
 
