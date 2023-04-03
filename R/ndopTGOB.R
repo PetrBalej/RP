@@ -515,15 +515,13 @@ for (druh in as.vector(sp.group$DRUH)) { # speciesParts[[ndop.fs$speciesPart]]
         }
     }
 
-    stop()
-
-
+  
     gc()
 
 
     # run vsech variant BG s ENMeval
     for (id in names(collector)) {
-        id.names <- unlist(strsplit(id, "_"))
+        id.names <- unlist(strsplit(id, "_"))[1]
         print(id)
         for (adjust in names(collector[[id]])) {
             print(adjust)
