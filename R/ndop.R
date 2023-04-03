@@ -171,7 +171,7 @@ ndop %<>% filter(KAT_TAX == "Ptáci")
 
 
 # sjednocuji (ať zbytečně neodstraňuji...)
-ndop %<>% mutate(DRUH == ifelse(DRUH == "Acanthis flammea/cabaret", "Acanthis flammea", DRUH))
+ndop %<>% mutate(DRUH = ifelse(DRUH == "Acanthis flammea/cabaret", "Acanthis flammea", DRUH))
 
 
 # záloha původních autorských jmen pro kontrolu
@@ -571,6 +571,7 @@ SPH_STAT.source.s <- st_simplify(SPH_STAT.source, preserveTopology = FALSE, dTol
 # druhy <- unique(as.vector(unlist(ndop.sf.POLE$DRUH)))
 druhy <- unique(as.vector(unlist(ndop$DRUH)))
 first <- TRUE
+first2 <- TRUE
 for (druh in druhy) {
   pres <- ndop.POLE %>% filter(DRUH == druh)
   pres.au <- unique(as.vector(unlist(pres$AUTOR)))
@@ -635,11 +636,111 @@ for (druh in druhy) {
 
   print(ggpl)
   dev.off()
+
+
+
+
+  #
+  # ssos - omezení autorů s "nepřirozeným"" poměrem sběru daného druhu
+  #
+
+  ### celkové
+  ssos.DRUH <- as_tibble(ssos) %>%
+    dplyr::select(-geometry) %>%
+    group_by(DRUH) %>%
+    summarise(POLE.n = n_distinct(POLE))
+  ssos.DRUH.sum.all <- sum(ssos.DRUH$POLE.n)
+  ssos.DRUH.sum <- as.numeric(ssos.DRUH %>% filter(DRUH == druh) %>% dplyr::select(POLE.n))
+  # "přirozený" poměr
+  ssos.DRUH.ratio <- (ssos.DRUH.sum / ssos.DRUH.sum.all) * 0.5 # snížím hranici na 30%, odstraní extrémy (lidi co druh značí jen občas)
+
+  ### autorské
+  ssos.DRUH.AUTOR <- as_tibble(ssos) %>%
+    dplyr::select(-geometry) %>%
+    group_by(DRUH, AUTOR) %>%
+    summarise(POLE.n = n_distinct(POLE))
+  ssos.DRUH.AUTOR.sum.all <- ssos.DRUH.AUTOR %>%
+    ungroup() %>%
+    group_by(AUTOR) %>%
+    summarise(POLE.n.sum.all = sum(POLE.n))
+  ssos.DRUH.AUTOR.sum <- ssos.DRUH.AUTOR %>%
+    ungroup() %>%
+    filter(DRUH == druh) %>%
+    group_by(AUTOR) %>%
+    summarise(POLE.n.sum = sum(POLE.n))
+
+  ssos.DRUH.AUTOR.ratio <- ssos.DRUH.AUTOR.sum %>%
+    left_join(ssos.DRUH.AUTOR.sum.all, by = "AUTOR") %>%
+    mutate(ratio = POLE.n.sum / POLE.n.sum.all) %>%
+    mutate(ratioLess = ifelse(ratio < ssos.DRUH.ratio, 1, 0))
+
+  # unname(quantile(ssos.DRUH.AUTOR.ratio$ratio, probs=0.25)
+
+
+  ssos.natural.au <- ssos.DRUH.AUTOR.ratio %>% filter(ratioLess == 0)
+
+  pres.au <- unique(ssos.natural.au$AUTOR)
+
+  ssos <- ndop.POLE %>% filter(AUTOR %in% pres.au)
+
+  ### opakování
+
+  ssos.unique <- ssos %>%
+    group_by(POLE) %>%
+    slice_head(n = 1)
+
+  # počet (unikátních, zrušit znásobení spoluautory) nálezů na pixel
+  ssos.count <- ssos %>%
+    group_by(POLE) %>%
+    mutate(pp = length(unique(ID_NALEZ))) %>%
+    slice_head(n = 1) %>%
+    st_centroid()
+
+
+  df.temp <- data.frame(
+    "species" = druh,
+    "p" = nrow(pres), "pu" = nrow(pres.unique),
+    "ssos" = nrow(ssos), "ssosu" = nrow(ssos.unique),
+    "authors" = length(pres.au)
+  )
+  if (first2) {
+    first2 <- FALSE
+    df.out2 <- df.temp
+  } else {
+    df.out2 %<>% add_row(df.temp)
+  }
+
+  pl <- ssos.count %>% dplyr::select(pp)
+
+  ggpl <- ggplot() +
+    geom_sf(data = SPH_STAT.source.s, fill = "LightBlue") +
+    geom_sf(data = pl, aes(colour = pp), pch = 15, size = 2) +
+    labs(color = "SSOS-TGOB (log10)", caption = paste0("occs source: AOPK NDOP (years: ", min(ndop.fs$years), "-", max(ndop.fs$years), "; months: ", min(ndop.fs$months), "-", max(ndop.fs$months), ") | author: Petr Balej | WGS84 | grid: KFME (SitMap_2Rad) | generated: ", Sys.Date())) +
+    scale_colour_gradient(low = "white", high = "red", trans = "log10") +
+    theme_light() +
+    geom_sf(data = pres.unique) +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 30, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5)
+    ) +
+    ggtitle(
+      label = (druh),
+      subtitle = paste0("SSOS-TGOB (same species observers occs per pixel) | p:", df.temp$pu, " / bg:", df.temp$ssosu, " / autors:", df.temp$authors)
+    )
+
+  png(paste0(path.ndop, "ssos/", str_replace_all(druh, "[\\/\\:]", "_"), "-natural.png"), width = 1200, height = 700)
+
+  print(ggpl)
+  dev.off()
 }
 
 
 saveRDS(df.out, paste0(path.ndop, "df.out.rds"))
 write.csv(df.out, paste0(path.ndop, "df.out.csv"), row.names = FALSE)
+
+saveRDS(df.out2, paste0(path.ndop, "df.out2.rds"))
+write.csv(df.out2, paste0(path.ndop, "df.out2.csv"), row.names = FALSE)
+
 
 # vygenerovat i mapy presencí druhu (počet) a backgroundu podle odpovídajících autorů (počty i per pixel)
 
