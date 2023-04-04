@@ -288,7 +288,8 @@ for (bgSourcesName in names(bgSources)) {
         dplyr::select(POLE)
     bgSources.fix[[bgSourcesName]] <- tgob.trad.POLE %>%
         ungroup() %>%
-        filter(POLE %in% unique(unname(unlist(temp.POLE))))
+        filter(POLE %in% unique(unname(unlist(temp.POLE)))) %>%
+        dplyr::select(-everything())
 }
 
 
@@ -420,7 +421,8 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
 
         bgSources.ssos.fix[[bgSourcesName]] <- tgob.trad.POLE %>%
             ungroup() %>%
-            filter(POLE %in% unique(unname(unlist(temp.POLE))))
+            filter(POLE %in% unique(unname(unlist(temp.POLE)))) %>%
+            dplyr::select(-everything())
     }
     # spojím se statickými
 
