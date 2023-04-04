@@ -17,7 +17,7 @@ print(cmd_arg)
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
-required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "ecospat") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
+required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "ecospat", "blockCV") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
 
 install.packages(setdiff(required_packages, rownames(installed.packages())))
 
@@ -292,6 +292,12 @@ for (bgSourcesName in names(bgSources)) {
         dplyr::select(-everything())
 }
 
+# bloky
+bCV <- blockCV::cv_spatial(st_as_sf(rasterToPoints(predictors[[1]], spatial = TRUE)) %>% dplyr::select(-everything()), size = 50000, deg_to_metre = 90000, k = 5, selection = "random", hexagon = TRUE, plot = FALSE)
+bCV.poly <- as_tibble(bCV[["blocks"]][["geometry"]])
+bCV.poly$fold <- bCV[["blocks"]][["folds"]]
+bCV.poly <- st_as_sf(bCV.poly)
+
 
 first <- TRUE
 for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$speciesPart]] c("Turdus viscivorus")
@@ -521,8 +527,6 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
     }
 
     gc()
-    stop()
-
     # run vsech variant BG s ENMeval
     for (id in names(collector)) {
         id.names <- unlist(strsplit(id, "_"))
@@ -532,13 +536,18 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
 
             bg.temp <- as.data.frame(st_coordinates(collector[[id]][["bg"]][[adjust]]))
             names(bg.temp) <- ll
+
+            block.bg <- collector[[id]][["bg"]][[adjust]] %>% st_join(bCV.poly)
+            block.p <- pres.unique %>% st_join(bCV.poly)
+
             print("základní:")
             e.mx.all[[druh]][[id]][[adjust]] <- ENMevaluate(
+                user.grp = list("occs.grp" = block.p$fold, "bg.grp" = block.bg$fold),
                 occs = df.temp,
                 envs = predictors,
                 bg = bg.temp,
-                algorithm = "maxnet", partitions = "randomkfold",
-                partition.settings = list("kfolds" = 3),
+                algorithm = "maxnet", partitions = "user",
+                # partition.settings = list("kfolds" = 3),
                 tune.args = tune.args,
                 other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
             )
@@ -550,12 +559,15 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
                     # přidat thinning presence
                     print("měním presenční dataset pro thinnovací verze")
 
+                    block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
+
                     e.mx.all[[druh]][[id]][[thinDist]] <- ENMevaluate(
+                        user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
                         occs = df.temp.thin,
                         envs = predictors,
                         bg = bg.temp,
-                        algorithm = "maxnet", partitions = "randomkfold",
-                        partition.settings = list("kfolds" = 3),
+                        algorithm = "maxnet", partitions = "user",
+                        # partition.settings = list("kfolds" = 3),
                         tune.args = tune.args,
                         other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
                     )
