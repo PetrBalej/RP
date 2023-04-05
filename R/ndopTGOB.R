@@ -293,7 +293,7 @@ for (bgSourcesName in names(bgSources)) {
 }
 
 # bloky
-bCV <- blockCV::cv_spatial(st_as_sf(rasterToPoints(predictors[[1]], spatial = TRUE)) %>% dplyr::select(-everything()), size = 50000, deg_to_metre = 90000, k = 5, selection = "random", hexagon = TRUE, seed=85, plot = FALSE)
+bCV <- blockCV::cv_spatial(st_as_sf(rasterToPoints(predictors[[1]], spatial = TRUE)) %>% dplyr::select(-everything()), size = 50000, deg_to_metre = 90000, k = 5, selection = "random", hexagon = TRUE, seed = 85, plot = FALSE)
 bCV.poly <- as_tibble(bCV[["blocks"]][["geometry"]])
 bCV.poly$fold <- bCV[["blocks"]][["folds"]]
 bCV.poly <- st_as_sf(bCV.poly)
@@ -506,8 +506,8 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
         id.names <- unlist(strsplit(id, "_"))
 
         # nemá smysl clipovat jiné než celorepublikové varianty (ostatní už jsou samy o sobě nějakým způsobem clipnuté)
-        if ((sum(c("kss", "area") %in% id.names[1]) == 1) & "buffer" != id.names[2]) {
-
+        # neclipuju area+ssos.x
+        if (((id.names[2] %notin% c("ssos", "ssos.2") & "area" == id.names[1]) | "kss" == id.names[1]) & "buffer" != id.names[2]) {
             # nemá smysl clipovat vzájemně ssos a ssos.2
             if ("ssos.2" != id.names[2]) {
                 for (adjust in names(collector[[id]][["bg"]])) {
