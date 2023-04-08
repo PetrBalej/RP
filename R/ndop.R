@@ -42,7 +42,7 @@ path.ndop <- paste0(path.prep, "ndop/")
 ndop.csv.path <- paste0(path.data, "aopk/ndop/download20230307/") # download20230328 - 2014-2017: v řadě krajů (~RP) není garantována ani validována značná část nálezů - nepoužitelné!!!
 sitmap_2rad.czechia <- readRDS(paste0(path.prep, "sitmap_2rad/sitmap_2rad-czechia.rds")) # 4326
 SPH_STAT.source <- st_read(paste0(path.data, "cuzk/SPH_SHP_WGS84/WGS84/SPH_STAT.shp"))
-
+lsd.pa.min <- readRDS(paste0(path.prep, "lsd/lsd.pa.min.rds"))
 ############
 # settings
 ############
@@ -277,6 +277,11 @@ print("NDOP po synonymizaci poddruhů:")
 nrow(ndop)
 nrow(ndop.POLE)
 length(unique(ndop$DRUH))
+
+
+# omezení: modeluju jen druhy které můžu z LSD ověřit (v budoucnu za dalších podmínek klidně všechny...)
+ndop %<>% filter(DRUH %in% unique(lsd.pa.min$TaxonNameLAT))
+ndop.POLE %<>% filter(DRUH %in% unique(lsd.pa.min$TaxonNameLAT))
 
 saveRDS(ndop, paste0(path.ndop, "ndopP.rds"))
 saveRDS(ndop.POLE, paste0(path.ndop, "ndopP.POLE.rds"))

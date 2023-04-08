@@ -321,6 +321,11 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
 
     tgob <- ndopP %>% filter(AUTOR %in% pres.au)
 
+# SSOS - nad top50 druhy
+
+tgob.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+
+
     pres.unique <- ndopP.POLE %>%
         filter(DRUH == druh) %>%
         group_by(POLE) %>%
@@ -369,7 +374,7 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
     ssos.DRUH.sum.all <- sum(ssos.DRUH$POLE.n)
     ssos.DRUH.sum <- as.numeric(ssos.DRUH %>% filter(DRUH == druh) %>% dplyr::select(POLE.n))
     # "přirozený" poměr
-    ssos.DRUH.ratio <- (ssos.DRUH.sum / ssos.DRUH.sum.all) * 0.5 # snížím hranici o 50%, odstraní extrémy (lidi co druh značí jen občas)
+    ssos.DRUH.ratio <- (ssos.DRUH.sum / ssos.DRUH.sum.all) * 0.1 # snížím hranici o 50%, odstraní extrémy (lidi co druh značí jen občas)
 
     ### autorské
     ssos.DRUH.AUTOR <- as_tibble(tgob) %>%
@@ -406,6 +411,7 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
     predictors.ssos2 <- mask(predictors[[1]], tgob.unique2)
 
 
+
     kss <- list(
         "cz" = predictors[[1]],
         "buffer" = predictors.ssos.buffer
@@ -413,7 +419,8 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
 
     bgSources.ssos <- list(
         "ssos" = tgob,
-        "ssos.2" = ssos
+        "ssos.2" = ssos,
+        "ssos.top" = tgob.top
     )
     # ze všech fixy
     bgSources.ssos.fix <- list()
@@ -447,7 +454,7 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
     }
     # # buffer
     id <- paste(c("kss", "buffer"), collapse = "_")
-    collector.temp <- smoothingRP(kss[["buffer"]], 1, pres, nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster) # vizuální kontrola!!!
+    collector.temp <- smoothingRP(kss[["buffer"]], c(0.1, 1, 2), pres, nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster) # vizuální kontrola!!!
     collector[[id]] <- collector.temp
 
     #
@@ -455,7 +462,7 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
     #
 
     for (bgSourcesName in names(bgSources.all.fix)) {
-        if (bgSourcesName %in% c("ssos", "ssos.2")) {
+        if (bgSourcesName %in% c("ssos", "ssos.2", "ssos.top")) {
             next
         }
         id <- paste(c("rss", bgSourcesName), collapse = "_")
@@ -502,29 +509,29 @@ for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$
     #
     # přidání clip verze tam kde dává smysl
     #
-    for (id in names(collector)) {
-        id.names <- unlist(strsplit(id, "_"))
+    # for (id in names(collector)) {
+    #     id.names <- unlist(strsplit(id, "_"))
 
-        # nemá smysl clipovat jiné než celorepublikové varianty (ostatní už jsou samy o sobě nějakým způsobem clipnuté)
-        # neclipuju area+ssos.x
-        if (((id.names[2] %notin% c("ssos", "ssos.2") & "area" == id.names[1]) | "kss" == id.names[1]) & "buffer" != id.names[2]) {
-            # nemá smysl clipovat vzájemně ssos a ssos.2
-            if ("ssos.2" != id.names[2]) {
-                for (adjust in names(collector[[id]][["bg"]])) {
-                    print("clip1*****************************")
-                    ex.temp <- extract(predictors.ssos, st_coordinates(collector[[id]][["bg"]][[adjust]]))
-                    collector[[paste0(id, "_clip.ssos")]][["bg"]][[adjust]] <- collector[[id]][["bg"]][[adjust]][!is.na(ex.temp), ]
-                }
-            }
-            if ("ssos" != id.names[2]) {
-                for (adjust in names(collector[[id]][["bg"]])) {
-                    print("clip2*****************************")
-                    ex.temp <- extract(predictors.ssos2, st_coordinates(collector[[id]][["bg"]][[adjust]]))
-                    collector[[paste0(id, "_clip.ssos.2")]][["bg"]][[adjust]] <- collector[[id]][["bg"]][[adjust]][!is.na(ex.temp), ]
-                }
-            }
-        }
-    }
+    #     # nemá smysl clipovat jiné než celorepublikové varianty (ostatní už jsou samy o sobě nějakým způsobem clipnuté)
+    #     # neclipuju area+ssos.x
+    #     if (((id.names[2] %notin% c("ssos", "ssos.2") & "area" == id.names[1]) | "kss" == id.names[1]) & "buffer" != id.names[2]) {
+    #         # nemá smysl clipovat vzájemně ssos a ssos.2
+    #         if ("ssos.2" != id.names[2]) {
+    #             for (adjust in names(collector[[id]][["bg"]])) {
+    #                 print("clip1*****************************")
+    #                 ex.temp <- extract(predictors.ssos, st_coordinates(collector[[id]][["bg"]][[adjust]]))
+    #                 collector[[paste0(id, "_clip.ssos")]][["bg"]][[adjust]] <- collector[[id]][["bg"]][[adjust]][!is.na(ex.temp), ]
+    #             }
+    #         }
+    #         if ("ssos" != id.names[2]) {
+    #             for (adjust in names(collector[[id]][["bg"]])) {
+    #                 print("clip2*****************************")
+    #                 ex.temp <- extract(predictors.ssos2, st_coordinates(collector[[id]][["bg"]][[adjust]]))
+    #                 collector[[paste0(id, "_clip.ssos.2")]][["bg"]][[adjust]] <- collector[[id]][["bg"]][[adjust]][!is.na(ex.temp), ]
+    #             }
+    #         }
+    #     }
+    # }
 
     gc()
     # run vsech variant BG s ENMeval
