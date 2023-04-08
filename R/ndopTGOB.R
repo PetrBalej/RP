@@ -347,16 +347,6 @@ for (rep in 1:ndop.fs$replicates) {
         df.temp <- as.data.frame(st_coordinates(pres.unique))
         names(df.temp) <- ll
 
-        # skill verze tradičního TGOB - všechny unikátní pixely do BG
-        # jen pro clip1
-        tgob.unique <- ndopP.POLE %>%
-            filter(AUTOR %in% pres.au) %>%
-            group_by(POLE) %>%
-            slice_head(n = 1) %>%
-            st_centroid() %>%
-            dplyr::select(-everything())
-        predictors.ssos <- mask(predictors[[1]], tgob.unique)
-
         # pro thinning - rozsahy
         sq2rad.dist <- ndop.fs$sq2rad[1] + 0.00001 # delší strana kvadrátu, přičtení drobné vzdálenosti
         sq2rad.dist.range <- sq2rad.dist * ndop.fs$sq2radDist
@@ -471,19 +461,6 @@ for (rep in 1:ndop.fs$replicates) {
         )
 
         bgSources.ssos <- append(bgSources.ssos.temp1, bgSources.ssos.temp2)
-
-
-
-
-        # jen pro clip2
-        tgob.unique2 <- ndopP.POLE %>%
-            filter(AUTOR %in% pres.au) %>%
-            group_by(POLE) %>%
-            slice_head(n = 1) %>%
-            st_centroid() %>%
-            dplyr::select(-everything())
-        predictors.ssos2 <- mask(predictors[[1]], tgob.unique2)
-
 
 
         kss <- list(
