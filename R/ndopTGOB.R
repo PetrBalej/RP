@@ -109,7 +109,7 @@ ndop.fs <- list(
     "speciesPerGroup" = 3, "speciesOccMin" = 30,
     "sq2rad" = c((1 / 6) / 4, 0.1 / 4), # kvadráty KFME 2rad, xy velikost ve stupních
     "sq2radDist" = c(1:5),
-    "replicates" = 1,
+    "replicates" = 3,
     "speciesPart" = cmd_arg, "version" = "v1",
     "bgRaster" = FALSE,
     "versionNames" = vn, "versionSmooting" = vf
@@ -333,7 +333,9 @@ for (rep in 1:ndop.fs$replicates) {
 
         # SSOS - nad top50 druhy
 
-        tgob.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        tgob.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        tgob.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
+        tgob.top100 <- bgSources$topA.100 %>% filter(AUTOR %in% pres.au)
 
 
         pres.unique <- ndopP.POLE %>%
@@ -401,29 +403,34 @@ for (rep in 1:ndop.fs$replicates) {
         ssos2_001 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[1])
         pres.au <- unique(ssos2_001$AUTOR)
         ssos2_001.P <- ndopP %>% filter(AUTOR %in% pres.au)
-        ssos2_001.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        ssos2_001.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        ssos2_001.P.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
+        ssos2_001.P.top100 <- bgSources$topA.100 %>% filter(AUTOR %in% pres.au)
 
         ssos2_010 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[2])
         pres.au <- unique(ssos2_010$AUTOR)
         ssos2_010.P <- ndopP %>% filter(AUTOR %in% pres.au)
-        ssos2_010.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
-
-        ssos2_025 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[3])
-        pres.au <- unique(ssos2_025$AUTOR)
-        ssos2_025.P <- ndopP %>% filter(AUTOR %in% pres.au)
-        ssos2_025.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        ssos2_010.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        ssos2_010.P.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
+        ssos2_010.P.top100 <- bgSources$topA.100 %>% filter(AUTOR %in% pres.au)
 
         ssos.DRUH.AUTOR.ratio.puv <- ssos.DRUH.AUTOR.ratio
 
 
         bgSources.ssos.temp1 <- list(
             "ssos.0" = tgob,
-            "ssos.0.topS50" = tgob.top,
+            "ssos.0.topS50" = tgob.top50,
+            "ssos.0.topS10" = tgob.top10,
+            "ssos.0.topA100" = tgob.top100,
             "ssos.1.001" = ssos2_001.P,
             "ssos.1.010" = ssos2_010.P,
             # "ssos.1.025" = ssos2_025.P,
-            "ssos.1.001.topS50" = ssos2_001.P.top,
-            "ssos.1.010.topS50" = ssos2_010.P.top
+            "ssos.1.001.topS50" = ssos2_001.P.top50,
+            "ssos.1.010.topS50" = ssos2_010.P.top50,
+            "ssos.1.001.topS10" = ssos2_001.P.top10,
+            "ssos.1.010.topS10" = ssos2_010.P.top10,
+            "ssos.1.001.topA100" = ssos2_001.P.top100,
+            "ssos.1.010.topA100" = ssos2_010.P.top100
             # "ssos.1.025.topS50" = ssos2_025.P.top
         )
 
@@ -438,26 +445,25 @@ for (rep in 1:ndop.fs$replicates) {
         ssos2_001 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[1])
         pres.au <- unique(ssos2_001$AUTOR)
         ssos2_001.P <- ndopP %>% filter(AUTOR %in% pres.au)
-        ssos2_001.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        ssos2_001.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        ssos2_001.P.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
 
         ssos2_010 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[2])
         pres.au <- unique(ssos2_010$AUTOR)
         ssos2_010.P <- ndopP %>% filter(AUTOR %in% pres.au)
-        ssos2_010.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
-
-        ssos2_025 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[3])
-        pres.au <- unique(ssos2_025$AUTOR)
-        ssos2_025.P <- ndopP %>% filter(AUTOR %in% pres.au)
-        ssos2_025.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        ssos2_010.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        ssos2_010.P.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
 
 
         bgSources.ssos.temp2 <- list(
             "ssos.2.001" = ssos2_001.P,
             "ssos.2.010" = ssos2_010.P,
-            # "ssos.2.025" = ssos2_025.P,
-            "ssos.2.001.topS50" = ssos2_001.P.top,
-            "ssos.2.010.topS50" = ssos2_010.P.top
-            # "ssos.2.025.topS50" = ssos2_025.P.top
+            # "ssos.1.025" = ssos2_025.P,
+            "ssos.2.001.topS50" = ssos2_001.P.top50,
+            "ssos.2.010.topS50" = ssos2_010.P.top50,
+            "ssos.2.001.topS10" = ssos2_001.P.top10,
+            "ssos.2.010.topS10" = ssos2_010.P.top10
+            # "ssos.1.025.topS50" = ssos2_025.P.top
         )
 
         bgSources.ssos <- append(bgSources.ssos.temp1, bgSources.ssos.temp2)
