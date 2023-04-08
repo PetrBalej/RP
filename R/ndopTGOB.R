@@ -9,7 +9,7 @@ if (is.na(cmd_arg[1])) {
 }
 
 print(cmd_arg)
-
+# "C:\Program Files\R\R-4.2.1\bin\x64\Rscript.exe" "D:\PersonalWork\Balej\v2\RP\RP\R\ndopTGOB.R" 1
 # library(devtools)
 # install_github("PetrBalej/ENMeval", force = TRUE)
 # *** Running ENMeval v2.0.4 with maxnet from maxnet package v0.1.4 *** -- na WS1
@@ -106,9 +106,10 @@ ndop.fs <- list(
     "adjusts" = c(0.1, 0.5, 1, 2, 3, 4),
     "tuneArgs" = list(fc = c("L", "LQ"), rm = c(1, 2, 3, 5, 10)),
     "bgRatio" = 1 / 10,
-    "speciesPerGroup" = 500, "speciesOccMin" = 30,
+    "speciesPerGroup" = 3, "speciesOccMin" = 30,
     "sq2rad" = c((1 / 6) / 4, 0.1 / 4), # kvadráty KFME 2rad, xy velikost ve stupních
     "sq2radDist" = c(1:5),
+    "replicates" = 1,
     "speciesPart" = cmd_arg, "version" = "v1",
     "bgRaster" = FALSE,
     "versionNames" = vn, "versionSmooting" = vf
@@ -266,8 +267,6 @@ tgob.trad.sp <- ndopP.POLE %>%
 sp.group <- ndop.stat.res.sp.selected.regrouped %>% filter(nthGroup == ndop.fs$speciesPart)
 
 
-# výchozí random BG společný pro všechny
-null.default <- generateRPall(predictors[[1]], nBackRatio = ndop.fs$bgRatio)
 
 # společný základ BG pro všechny druhy
 bgSources <- list(
@@ -275,7 +274,8 @@ bgSources <- list(
     # "ssos" = tgob,
     # "ssos.2" = ssos,
     # "topA.10" = ndop.topAUTOR10, # pokrývají jen část ČR - nerovnoměrně, přestože mají značnou část nálezů
-    "topA.100" = ndop.topAUTOR100, "topS.10" = ndop.topDRUH10, "topS.50" = ndop.topDRUH50
+    "topA.100" = ndop.topAUTOR100, "topS.10" = ndop.topDRUH10,
+    "topS.50" = ndop.topDRUH50
 )
 
 # fix area
@@ -292,285 +292,349 @@ for (bgSourcesName in names(bgSources)) {
         dplyr::select(-everything())
 }
 
-# bloky
-bCV <- blockCV::cv_spatial(st_as_sf(rasterToPoints(predictors[[1]], spatial = TRUE)) %>% dplyr::select(-everything()), size = 50000, deg_to_metre = 90000, k = 5, selection = "random", hexagon = TRUE, seed = 85, plot = FALSE)
-bCV.poly <- as_tibble(bCV[["blocks"]][["geometry"]])
-bCV.poly$fold <- bCV[["blocks"]][["folds"]]
-bCV.poly <- st_as_sf(bCV.poly)
-
-
-first <- TRUE
-for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$speciesPart]] c("Turdus viscivorus")
-    collector <- list()
-    collector.thin <- list()
-    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-    print(druh)
-    print(sp.group)
-    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-    e.mx.all <- list()
-    bg.col <- list()
-
-    pres <- ndopP %>% filter(DRUH == druh)
-
-    pres.au <- unique(as.vector(unlist(pres$AUTOR)))
-    # "skill TGOB" - vyberu pro TGOB pouze nálezy těch autorů, kteří už daný druh pozorovali
-    # Ostatní jsou nejistí, respektive jejich sampling effort je irelevantní, protože není jisté, zda-li:
-    # - druh vůbec poznají,
-    # - jsou ochotní ho zaznamenávat nebo
-    # - vůbec nemapují v oblasti výskytu druhu
-
-    tgob <- ndopP %>% filter(AUTOR %in% pres.au)
-
-# SSOS - nad top50 druhy
-
-tgob.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
-
-
-    pres.unique <- ndopP.POLE %>%
-        filter(DRUH == druh) %>%
-        group_by(POLE) %>%
-        slice_head(n = 1) %>%
-        st_centroid() %>%
-        dplyr::select(-everything())
-
-    # presence do modelu a k thinningu
-    df.temp <- as.data.frame(st_coordinates(pres.unique))
-    names(df.temp) <- ll
-
-    # skill verze tradičního TGOB - všechny unikátní pixely do BG
-    # jen pro clip1
-    tgob.unique <- ndopP.POLE %>%
-        filter(AUTOR %in% pres.au) %>%
-        group_by(POLE) %>%
-        slice_head(n = 1) %>%
-        st_centroid() %>%
-        dplyr::select(-everything())
-    predictors.ssos <- mask(predictors[[1]], tgob.unique)
-
-    # pro thinning - rozsahy
-    sq2rad.dist <- ndop.fs$sq2rad[1] + 0.00001 # delší strana kvadrátu, přičtení drobné vzdálenosti
-    sq2rad.dist.range <- sq2rad.dist * ndop.fs$sq2radDist
-
-    # buffer kolem presencí
-    # náhodně může vznikat více typů geometrií, pak to spadne do sfc_GEOMETRY, to nechci (neumí s tím pak pracovat dále některé funkce), vybírám pouze (MULTI)POLYGON
-    # buffer je 4*strana 2rad, od středu kvadrátu tedy cca 12 km, reálně mi jde o to získat buffer cca 3 čtverců okolo sousedících
-    pres.unique.buffer <- st_as_sf(st_union(st_buffer(pres.unique, 10000))) %>% filter(st_geometry_type(x) %in% c("MULTIPOLYGON", "POLYGON"))
-    predictors.ssos.buffer <- mask(predictors[[1]], pres.unique.buffer)
-
-
-    tgob.trad.tm <- tgob.trad.sp %>% filter(DRUH == druh)
-    tgob.trad.tm.df <- as.data.frame(st_coordinates(tgob.trad.tm))
-    colnames(tgob.trad.tm.df) <- c("x", "y")
-
-    #
-    # ssos - omezení autorů s "nepřirozeným"" poměrem sběru daného druhu
-    #
-
-    ### celkové
-    ssos.DRUH <- as_tibble(tgob) %>%
-        dplyr::select(-geometry) %>%
-        group_by(DRUH) %>%
-        summarise(POLE.n = n_distinct(POLE))
-    ssos.DRUH.sum.all <- sum(ssos.DRUH$POLE.n)
-    ssos.DRUH.sum <- as.numeric(ssos.DRUH %>% filter(DRUH == druh) %>% dplyr::select(POLE.n))
-    # "přirozený" poměr
-    ssos.DRUH.ratio <- (ssos.DRUH.sum / ssos.DRUH.sum.all) * 0.1 # snížím hranici o 50%, odstraní extrémy (lidi co druh značí jen občas)
-
-    ### autorské
-    ssos.DRUH.AUTOR <- as_tibble(tgob) %>%
-        dplyr::select(-geometry) %>%
-        group_by(DRUH, AUTOR) %>%
-        summarise(POLE.n = n_distinct(POLE))
-    ssos.DRUH.AUTOR.sum.all <- ssos.DRUH.AUTOR %>%
-        ungroup() %>%
-        group_by(AUTOR) %>%
-        summarise(POLE.n.sum.all = sum(POLE.n))
-    ssos.DRUH.AUTOR.sum <- ssos.DRUH.AUTOR %>%
-        ungroup() %>%
-        filter(DRUH == druh) %>%
-        group_by(AUTOR) %>%
-        summarise(POLE.n.sum = sum(POLE.n))
-
-    ssos.DRUH.AUTOR.ratio <- ssos.DRUH.AUTOR.sum %>%
-        left_join(ssos.DRUH.AUTOR.sum.all, by = "AUTOR") %>%
-        mutate(ratio = POLE.n.sum / POLE.n.sum.all) %>%
-        mutate(ratioLess = ifelse(ratio < ssos.DRUH.ratio, 1, 0))
-
-    # unname(quantile(ssos.DRUH.AUTOR.ratio$ratio, probs=0.25) - asi nechci automaticky odstranit 1/4, jen lidi s nižším než 50% z SSOS poměru zastoupení druhu oproti ostatním druhům
-    ssos.natural.au <- ssos.DRUH.AUTOR.ratio %>% filter(ratioLess == 0)
-    pres.au <- unique(ssos.natural.au$AUTOR)
-    ssos <- ndopP %>% filter(AUTOR %in% pres.au)
-
-    # jen pro clip2
-    tgob.unique2 <- ndopP.POLE %>%
-        filter(AUTOR %in% pres.au) %>%
-        group_by(POLE) %>%
-        slice_head(n = 1) %>%
-        st_centroid() %>%
-        dplyr::select(-everything())
-    predictors.ssos2 <- mask(predictors[[1]], tgob.unique2)
 
 
 
-    kss <- list(
-        "cz" = predictors[[1]],
-        "buffer" = predictors.ssos.buffer
-    )
+for (rep in 1:ndop.fs$replicates) {
+    print("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
+    print(rep)
+    set.seed(rep)
 
-    bgSources.ssos <- list(
-        "ssos" = tgob,
-        "ssos.2" = ssos,
-        "ssos.top" = tgob.top
-    )
-    # ze všech fixy
-    bgSources.ssos.fix <- list()
+    # bloky
+    bCV <- blockCV::cv_spatial(st_as_sf(rasterToPoints(predictors[[1]], spatial = TRUE)) %>% dplyr::select(-everything()), size = 50000, deg_to_metre = 90000, k = 5, selection = "random", hexagon = TRUE, seed = rep, plot = FALSE)
+    bCV.poly <- as_tibble(bCV[["blocks"]][["geometry"]])
+    bCV.poly$fold <- bCV[["blocks"]][["folds"]]
+    bCV.poly <- st_as_sf(bCV.poly)
 
-    for (bgSourcesName in names(bgSources.ssos)) {
-        temp.POLE <- as_tibble(bgSources.ssos[[bgSourcesName]]) %>%
-            dplyr::select(-geometry) %>%
+    # výchozí random BG společný pro všechny
+    null.default <- generateRPall(predictors[[1]], nBackRatio = ndop.fs$bgRatio)
+
+    first <- TRUE
+    for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$speciesPart]] c("Turdus viscivorus")
+        collector <- list()
+        collector.thin <- list()
+        print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        print(druh)
+        print(sp.group)
+        print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        e.mx.all <- list()
+        bg.col <- list()
+
+        pres <- ndopP %>% filter(DRUH == druh)
+
+        pres.au <- unique(as.vector(unlist(pres$AUTOR)))
+        # "skill TGOB" - vyberu pro TGOB pouze nálezy těch autorů, kteří už daný druh pozorovali
+        # Ostatní jsou nejistí, respektive jejich sampling effort je irelevantní, protože není jisté, zda-li:
+        # - druh vůbec poznají,
+        # - jsou ochotní ho zaznamenávat nebo
+        # - vůbec nemapují v oblasti výskytu druhu
+
+        tgob <- ndopP %>% filter(AUTOR %in% pres.au)
+
+        # SSOS - nad top50 druhy
+
+        tgob.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+
+
+        pres.unique <- ndopP.POLE %>%
+            filter(DRUH == druh) %>%
             group_by(POLE) %>%
             slice_head(n = 1) %>%
-            dplyr::select(POLE)
-
-        bgSources.ssos.fix[[bgSourcesName]] <- tgob.trad.POLE %>%
-            ungroup() %>%
-            filter(POLE %in% unique(unname(unlist(temp.POLE)))) %>%
+            st_centroid() %>%
             dplyr::select(-everything())
-    }
-    # spojím se statickými
 
-    bgSources.all <- append(bgSources, bgSources.ssos)
-    bgSources.all.fix <- append(bgSources.fix, bgSources.ssos.fix)
+        # presence do modelu a k thinningu
+        df.temp <- as.data.frame(st_coordinates(pres.unique))
+        names(df.temp) <- ll
+
+        # skill verze tradičního TGOB - všechny unikátní pixely do BG
+        # jen pro clip1
+        tgob.unique <- ndopP.POLE %>%
+            filter(AUTOR %in% pres.au) %>%
+            group_by(POLE) %>%
+            slice_head(n = 1) %>%
+            st_centroid() %>%
+            dplyr::select(-everything())
+        predictors.ssos <- mask(predictors[[1]], tgob.unique)
+
+        # pro thinning - rozsahy
+        sq2rad.dist <- ndop.fs$sq2rad[1] + 0.00001 # delší strana kvadrátu, přičtení drobné vzdálenosti
+        sq2rad.dist.range <- sq2rad.dist * ndop.fs$sq2radDist
+
+        # buffer kolem presencí
+        # náhodně může vznikat více typů geometrií, pak to spadne do sfc_GEOMETRY, to nechci (neumí s tím pak pracovat dále některé funkce), vybírám pouze (MULTI)POLYGON
+        # buffer je 4*strana 2rad, od středu kvadrátu tedy cca 12 km, reálně mi jde o to získat buffer cca 3 čtverců okolo sousedících
+        pres.unique.buffer <- st_as_sf(st_union(st_buffer(pres.unique, 10000))) %>% filter(st_geometry_type(x) %in% c("MULTIPOLYGON", "POLYGON"))
+        predictors.ssos.buffer <- mask(predictors[[1]], pres.unique.buffer)
 
 
-    print("start sampling variant BG")
-    #
-    # KSS
-    #
-    for (bgSourcesName in names(bgSources.all)) {
-        id <- paste(c("kss", bgSourcesName), collapse = "_")
-        collector.temp <- smoothingRP(kss[["cz"]], ndop.fs$adjusts, bgSources.all[[bgSourcesName]], nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster)
-        collector[[id]] <- collector.temp
-    }
-    # # buffer
-    id <- paste(c("kss", "buffer"), collapse = "_")
-    collector.temp <- smoothingRP(kss[["buffer"]], c(0.1, 1, 2), pres, nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster) # vizuální kontrola!!!
-    collector[[id]] <- collector.temp
+        tgob.trad.tm <- tgob.trad.sp %>% filter(DRUH == druh)
+        tgob.trad.tm.df <- as.data.frame(st_coordinates(tgob.trad.tm))
+        colnames(tgob.trad.tm.df) <- c("x", "y")
 
-    #
-    # RSS - ne z ssos (může být hodně málo... - stačí area_ssos.x)
-    #
+        #
+        # ssos - omezení autorů s "nepřirozeným"" poměrem sběru daného druhu
+        #
 
-    for (bgSourcesName in names(bgSources.all.fix)) {
-        if (bgSourcesName %in% c("ssos", "ssos.2", "ssos.top")) {
-            next
+        ### celkové
+        # ssos.DRUH <- as_tibble(tgob) %>%
+        #     dplyr::select(-geometry) %>%
+        #     group_by(DRUH) %>%
+        #     summarise(POLE.n = n_distinct(POLE))
+        # ssos.DRUH.sum.all <- sum(ssos.DRUH$POLE.n)
+        # ssos.DRUH.sum <- as.numeric(ssos.DRUH %>% filter(DRUH == druh) %>% dplyr::select(POLE.n))
+        # # "přirozený" poměr
+        # ssos.DRUH.ratio <- (ssos.DRUH.sum / ssos.DRUH.sum.all) * 0.1 # snížím hranici o 50%, odstraní extrémy (lidi co druh značí jen občas)
+
+        ### autorské
+        ssos.DRUH.AUTOR <- as_tibble(tgob) %>%
+            dplyr::select(-geometry) %>%
+            group_by(DRUH, AUTOR) %>%
+            summarise(POLE.n = n_distinct(POLE))
+        ssos.DRUH.AUTOR.sum.all <- ssos.DRUH.AUTOR %>%
+            ungroup() %>%
+            group_by(AUTOR) %>%
+            summarise(POLE.n.sum.all = sum(POLE.n))
+        ssos.DRUH.AUTOR.sum <- ssos.DRUH.AUTOR %>%
+            ungroup() %>%
+            filter(DRUH == druh) %>%
+            group_by(AUTOR) %>%
+            summarise(POLE.n.sum = sum(POLE.n))
+
+        ssos.DRUH.AUTOR.ratio <- ssos.DRUH.AUTOR.sum %>%
+            left_join(ssos.DRUH.AUTOR.sum.all, by = "AUTOR") %>%
+            mutate(ratio = POLE.n.sum / POLE.n.sum.all)
+        # %>%  mutate(ratioLess = ifelse(ratio < ssos.DRUH.ratio, 1, 0))
+
+        ssos.DRUH.ratio.quantile <- unname(quantile(ssos.DRUH.AUTOR.ratio$ratio, probs = c(0.01, 0.10, 0.25))) #- asi nechci automaticky odstranit 1/4, jen lidi s nižším než 50% z SSOS poměru zastoupení druhu oproti ostatním druhům
+
+        ssos2_001 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[1])
+        pres.au <- unique(ssos2_001$AUTOR)
+        ssos2_001.P <- ndopP %>% filter(AUTOR %in% pres.au)
+        ssos2_001.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+
+        ssos2_010 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[2])
+        pres.au <- unique(ssos2_010$AUTOR)
+        ssos2_010.P <- ndopP %>% filter(AUTOR %in% pres.au)
+        ssos2_010.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+
+        ssos2_025 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[3])
+        pres.au <- unique(ssos2_025$AUTOR)
+        ssos2_025.P <- ndopP %>% filter(AUTOR %in% pres.au)
+        ssos2_025.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+
+        ssos.DRUH.AUTOR.ratio.puv <- ssos.DRUH.AUTOR.ratio
+
+
+        bgSources.ssos.temp1 <- list(
+            "ssos.0" = tgob,
+            "ssos.0.topS50" = tgob.top,
+            "ssos.1.001" = ssos2_001.P,
+            "ssos.1.010" = ssos2_010.P,
+            # "ssos.1.025" = ssos2_025.P,
+            "ssos.1.001.topS50" = ssos2_001.P.top,
+            "ssos.1.010.topS50" = ssos2_010.P.top
+            # "ssos.1.025.topS50" = ssos2_025.P.top
+        )
+
+
+        ### autorské bez jedničkových
+        ### autorské
+
+        ssos.DRUH.AUTOR.ratio %<>% filter(POLE.n.sum > 1)
+
+        ssos.DRUH.ratio.quantile <- unname(quantile(ssos.DRUH.AUTOR.ratio$ratio, probs = c(0.01, 0.10, 0.25))) #- asi nechci automaticky odstranit 1/4, jen lidi s nižším než 50% z SSOS poměru zastoupení druhu oproti ostatním druhům
+
+        ssos2_001 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[1])
+        pres.au <- unique(ssos2_001$AUTOR)
+        ssos2_001.P <- ndopP %>% filter(AUTOR %in% pres.au)
+        ssos2_001.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+
+        ssos2_010 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[2])
+        pres.au <- unique(ssos2_010$AUTOR)
+        ssos2_010.P <- ndopP %>% filter(AUTOR %in% pres.au)
+        ssos2_010.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+
+        ssos2_025 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[3])
+        pres.au <- unique(ssos2_025$AUTOR)
+        ssos2_025.P <- ndopP %>% filter(AUTOR %in% pres.au)
+        ssos2_025.P.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+
+
+        bgSources.ssos.temp2 <- list(
+            "ssos.2.001" = ssos2_001.P,
+            "ssos.2.010" = ssos2_010.P,
+            # "ssos.2.025" = ssos2_025.P,
+            "ssos.2.001.topS50" = ssos2_001.P.top,
+            "ssos.2.010.topS50" = ssos2_010.P.top
+            # "ssos.2.025.topS50" = ssos2_025.P.top
+        )
+
+        bgSources.ssos <- append(bgSources.ssos.temp1, bgSources.ssos.temp2)
+
+
+
+
+        # jen pro clip2
+        tgob.unique2 <- ndopP.POLE %>%
+            filter(AUTOR %in% pres.au) %>%
+            group_by(POLE) %>%
+            slice_head(n = 1) %>%
+            st_centroid() %>%
+            dplyr::select(-everything())
+        predictors.ssos2 <- mask(predictors[[1]], tgob.unique2)
+
+
+
+        kss <- list(
+            "cz" = predictors[[1]],
+            "buffer" = predictors.ssos.buffer
+        )
+
+        # ze všech fixy
+        bgSources.ssos.fix <- list()
+
+        for (bgSourcesName in names(bgSources.ssos)) {
+            temp.POLE <- as_tibble(bgSources.ssos[[bgSourcesName]]) %>%
+                dplyr::select(-geometry) %>%
+                group_by(POLE) %>%
+                slice_head(n = 1) %>%
+                dplyr::select(POLE)
+
+            bgSources.ssos.fix[[bgSourcesName]] <- tgob.trad.POLE %>%
+                ungroup() %>%
+                filter(POLE %in% unique(unname(unlist(temp.POLE)))) %>%
+                dplyr::select(-everything())
         }
-        id <- paste(c("rss", bgSourcesName), collapse = "_")
-        collector.temp <- list()
-        collector.temp[["bg"]][["0"]] <- generateRPall(bgSources.all.fix[[bgSourcesName]], nBackRatio = ndop.fs$bgRatio)
+        # spojím se statickými
+
+        bgSources.all <- append(bgSources, bgSources.ssos)
+        bgSources.all.fix <- append(bgSources.fix, bgSources.ssos.fix)
+
+
+        print("start sampling variant BG")
+        #
+        # KSS
+        #
+        for (bgSourcesName in names(bgSources.all)) {
+            id <- paste(c("kss", bgSourcesName), collapse = "_")
+            collector.temp <- smoothingRP(kss[["cz"]], ndop.fs$adjusts, bgSources.all[[bgSourcesName]], nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster)
+            collector[[id]] <- collector.temp
+        }
+        # # buffer
+        id <- paste(c("kss", "buffer"), collapse = "_")
+        collector.temp <- smoothingRP(kss[["buffer"]], c(0.1, 1, 4), pres, nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster) # vizuální kontrola!!!
         collector[[id]] <- collector.temp
-    }
-    # # buffer
-    id <- paste(c("rss", "buffer"), collapse = "_")
-    collector.temp <- list()
-    collector.temp[["bg"]][["0"]] <- generateRPall(kss[["buffer"]], nBackRatio = ndop.fs$bgRatio) # vizuální kontrola!!!
-    collector[[id]] <- collector.temp
 
+        #
+        # RSS - ne z ssos (může být hodně málo... - stačí area_ssos.x)
+        #
 
-    #
-    # area
-    #
-
-    for (bgSourcesName in names(bgSources.all.fix)) {
-        id <- paste(c("area", bgSourcesName), collapse = "_")
+        for (bgSourcesName in names(bgSources.all.fix)) {
+            if (bgSourcesName %in% c("ssos", "ssos.2", "ssos.top")) {
+                next
+            }
+            id <- paste(c("rss", bgSourcesName), collapse = "_")
+            collector.temp <- list()
+            collector.temp[["bg"]][["0"]] <- generateRPall(bgSources.all.fix[[bgSourcesName]], nBackRatio = ndop.fs$bgRatio)
+            collector[[id]] <- collector.temp
+        }
+        # # buffer
+        id <- paste(c("rss", "buffer"), collapse = "_")
         collector.temp <- list()
-        collector.temp[["bg"]][["0"]] <- bgSources.all.fix[[bgSourcesName]]
+        collector.temp[["bg"]][["0"]] <- generateRPall(kss[["buffer"]], nBackRatio = ndop.fs$bgRatio) # vizuální kontrola!!!
         collector[[id]] <- collector.temp
-    }
-    # # buffer
-    id <- paste(c("area", "buffer"), collapse = "_")
-    collector.temp <- list()
-    collector.temp[["bg"]][["0"]] <- st_as_sf(rasterToPoints(kss[["buffer"]], spatial = TRUE)) %>% dplyr::select(-everything()) # vizuální kontrola!!!
-    collector[[id]] <- collector.temp
-
-    #
-    # un je fix sám o sobě, přidám
-    #
-    id <- paste(c("rss", "un"), collapse = "_")
-    collector[[id]][["bg"]][["0"]] <- null.default
 
 
-    # thinning  presencí pro UN
-    for (thinDist in sq2rad.dist.range) {
-        occs.thinned <- ecospat.occ.desaggregation(xy = tgob.trad.tm.df, min.dist = thinDist, by = NULL)
-        thinDist <- as.character(thinDist)
-        collector.thin[[id]][[thinDist]] <- occs.thinned %>% st_as_sf(coords = c("x", "y"), crs = 4326)
-    }
-    #
-    # přidání clip verze tam kde dává smysl
-    #
-    # for (id in names(collector)) {
-    #     id.names <- unlist(strsplit(id, "_"))
+        #
+        # area
+        #
 
-    #     # nemá smysl clipovat jiné než celorepublikové varianty (ostatní už jsou samy o sobě nějakým způsobem clipnuté)
-    #     # neclipuju area+ssos.x
-    #     if (((id.names[2] %notin% c("ssos", "ssos.2") & "area" == id.names[1]) | "kss" == id.names[1]) & "buffer" != id.names[2]) {
-    #         # nemá smysl clipovat vzájemně ssos a ssos.2
-    #         if ("ssos.2" != id.names[2]) {
-    #             for (adjust in names(collector[[id]][["bg"]])) {
-    #                 print("clip1*****************************")
-    #                 ex.temp <- extract(predictors.ssos, st_coordinates(collector[[id]][["bg"]][[adjust]]))
-    #                 collector[[paste0(id, "_clip.ssos")]][["bg"]][[adjust]] <- collector[[id]][["bg"]][[adjust]][!is.na(ex.temp), ]
-    #             }
-    #         }
-    #         if ("ssos" != id.names[2]) {
-    #             for (adjust in names(collector[[id]][["bg"]])) {
-    #                 print("clip2*****************************")
-    #                 ex.temp <- extract(predictors.ssos2, st_coordinates(collector[[id]][["bg"]][[adjust]]))
-    #                 collector[[paste0(id, "_clip.ssos.2")]][["bg"]][[adjust]] <- collector[[id]][["bg"]][[adjust]][!is.na(ex.temp), ]
-    #             }
-    #         }
-    #     }
-    # }
+        for (bgSourcesName in names(bgSources.all.fix)) {
+            id <- paste(c("area", bgSourcesName), collapse = "_")
+            collector.temp <- list()
+            collector.temp[["bg"]][["0"]] <- bgSources.all.fix[[bgSourcesName]]
+            collector[[id]] <- collector.temp
+        }
+        # # buffer
+        id <- paste(c("area", "buffer"), collapse = "_")
+        collector.temp <- list()
+        collector.temp[["bg"]][["0"]] <- st_as_sf(rasterToPoints(kss[["buffer"]], spatial = TRUE)) %>% dplyr::select(-everything()) # vizuální kontrola!!!
+        collector[[id]] <- collector.temp
 
-    gc()
-    # run vsech variant BG s ENMeval
-    for (id in names(collector)) {
-        id.names <- unlist(strsplit(id, "_"))
-        print(id)
-        for (adjust in names(collector[[id]][["bg"]])) {
-            print(adjust)
+        #
+        # un je fix sám o sobě, přidám
+        #
+        id <- paste(c("rss", "un"), collapse = "_")
+        collector[[id]][["bg"]][["0"]] <- null.default
 
-            bg.temp <- as.data.frame(st_coordinates(collector[[id]][["bg"]][[adjust]]))
-            names(bg.temp) <- ll
 
-            block.bg <- collector[[id]][["bg"]][[adjust]] %>% st_join(bCV.poly)
-            block.p <- pres.unique %>% st_join(bCV.poly)
+        # thinning  presencí pro UN
+        for (thinDist in sq2rad.dist.range) {
+            occs.thinned <- ecospat.occ.desaggregation(xy = tgob.trad.tm.df, min.dist = thinDist, by = NULL)
+            thinDist <- as.character(thinDist)
+            collector.thin[[id]][[thinDist]] <- occs.thinned %>% st_as_sf(coords = c("x", "y"), crs = 4326)
+        }
 
-            print("základní:")
-            e.mx.all[[druh]][[id]][[adjust]] <- ENMevaluate(
-                user.grp = list("occs.grp" = block.p$fold, "bg.grp" = block.bg$fold),
-                occs = df.temp,
-                envs = predictors,
-                bg = bg.temp,
-                algorithm = "maxnet", partitions = "user",
-                # partition.settings = list("kfolds" = 3),
-                tune.args = tune.args,
-                other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
-            )
-            if ("un" == id.names[2]) {
-                print("thin:")
-                for (thinDist in names(collector.thin[[id]])) {
-                    df.temp.thin <- as.data.frame(st_coordinates(collector.thin[[id]][[thinDist]]))
-                    names(df.temp.thin) <- ll
-                    # přidat thinning presence
-                    print("měním presenční dataset pro thinnovací verze")
 
-                    block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
+        # ze všech fixů (skoro) udělat masky pro clip
+        #
+        # přidání clip verze tam kde dává smysl
+        #
 
-                    e.mx.all[[druh]][[id]][[thinDist]] <- ENMevaluate(
-                        user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
-                        occs = df.temp.thin,
+        ### čím clipuju
+        for (idc in names(collector)) {
+            id.namesc <- unlist(strsplit(idc, "_"))
+
+            # nemá smysl clipovat jiné než celorepublikové varianty (ostatní už jsou samy o sobě nějakým způsobem clipnuté)
+            # neclipuju area+ssos.x
+            if ("area" == id.namesc[1] & "buffer" != id.namesc[2] & "tgob" != id.namesc[2] & !str_detect(id.namesc[2], "top") & is.na(id.namesc[3])) {
+                for (adjustc in names(collector[[idc]][["bg"]])) {
+                    print("clip čím *****************************")
+                    print(idc)
+                    ssos.mask <- mask(predictors[[1]], collector[[idc]][["bg"]][[adjustc]])
+
+                    ### co clipuju
+                    for (id in names(collector)) {
+                        id.names <- unlist(strsplit(id, "_"))
+                        if ((id.namesc[2] == id.names[2]) | (str_detect(id.namesc[2], "ssos") & str_detect(id.names[2], "ssos"))) {
+                            # neclipuju sebe sama a ssos vzájemně
+                            next
+                        }
+
+                        if ("kss" == id.names[1] & "buffer" != id.names[2] & is.na(id.names[3])) {
+                            for (adjust in names(collector[[id]][["bg"]])) {
+                                print("clip čeho ******")
+                                print(id)
+                                ex.temp <- extract(ssos.mask, st_coordinates(collector[[id]][["bg"]][[adjust]]))
+                                collector[[paste0(id, "_", id.namesc[2])]][["bg"]][[adjust]] <- collector[[id]][["bg"]][[adjust]][!is.na(ex.temp), ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        gc()
+        # run vsech variant BG s ENMeval
+        for (id in names(collector)) {
+            id.names <- unlist(strsplit(id, "_"))
+            print(id)
+            for (adjust in names(collector[[id]][["bg"]])) {
+                print(adjust)
+
+                bg.temp <- as.data.frame(st_coordinates(collector[[id]][["bg"]][[adjust]]))
+                names(bg.temp) <- ll
+
+                block.bg <- collector[[id]][["bg"]][[adjust]] %>% st_join(bCV.poly)
+                block.p <- pres.unique %>% st_join(bCV.poly)
+
+                print("základní:")
+
+                if (inherits(try({
+                    e.mx.all[[druh]][[id]][[adjust]] <- ENMevaluate(
+                        user.grp = list("occs.grp" = block.p$fold, "bg.grp" = block.bg$fold),
+                        occs = df.temp,
                         envs = predictors,
                         bg = bg.temp,
                         algorithm = "maxnet", partitions = "user",
@@ -578,17 +642,44 @@ tgob.top <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
                         tune.args = tune.args,
                         other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
                     )
+                }), "try-error")) {
+                    e.mx.all[[druh]][[id]][[adjust]] <- NA
+                }
+
+                # varianta s thinningem presencí přidaných do UN
+                if ("un" == id.names[2]) {
+                    print("thin:")
+                    for (thinDist in names(collector.thin[[id]])) {
+                        df.temp.thin <- as.data.frame(st_coordinates(collector.thin[[id]][[thinDist]]))
+                        names(df.temp.thin) <- ll
+                        # podstrčit thinning presence místo původních
+                        print("měním presenční dataset pro thinnovací verze")
+
+                        block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
+
+                        if (inherits(try({
+                            e.mx.all[[druh]][[id]][[thinDist]] <- ENMevaluate(
+                                user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
+                                occs = df.temp.thin,
+                                envs = predictors,
+                                bg = bg.temp,
+                                algorithm = "maxnet", partitions = "user",
+                                # partition.settings = list("kfolds" = 3),
+                                tune.args = tune.args,
+                                other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
+                            )
+                        }), "try-error")) {
+                            e.mx.all[[druh]][[id]][[thinDist]] <- NA
+                        }
+                    }
                 }
             }
         }
+
+        saveRDS(e.mx.all, paste0(path.tgob, "ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
+        gc()
     }
-
-
-    saveRDS(e.mx.all, paste0(path.tgob, "ssos_", druh, "_", ndop.fs$speciesPart, ".rds"))
-    gc()
 }
-
-
 end_time <- Sys.time()
 print(end_time - start_time)
 
