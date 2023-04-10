@@ -82,17 +82,12 @@ ndop.fs <- list("months" = c(4:6), "years" = c(2019:2022), "precision" = 1000, "
 # plot(`ssos.t_Accipiter gentilis_1`$auc.val.avg, `ssos.t_Accipiter gentilis_1`$AUC)
 
 
-
-
-
-
 "%notin%" <- Negate("%in%")
 
 
-
-modelsResults <- paste0(path.eval, "tbl.rds")
+modelsResults <- paste0(path.eval, "tbl.rep.rds")
 if (file.exists(modelsResults)) {
-  print("načítám existující tbl")
+  print("načítám existující tbl.rep")
   tbl <- readRDS(modelsResults)
 } else {
   print("generuju výsledky")
@@ -100,15 +95,21 @@ if (file.exists(modelsResults)) {
   rds_list <-
     list.files(
       path.eval,
-      pattern = paste0("^ssos.t_"),
+      pattern = paste0("^t_"),
       ignore.case = TRUE,
       full.names = TRUE
     )
 
   first <- TRUE
   for (rdsPath in rds_list) {
-    print(rdsPath)
+    bn <- basename(rdsPath)
+    r <- unlist(strsplit(unlist(strsplit(bn, "[.]"))[1], "_"))[5]
+
+    print(bn)
+    print(r)
+
     rds <- readRDS(rdsPath)
+    rds$rep <- r
     if (first) {
       first <- FALSE
       out <- rds
@@ -118,25 +119,50 @@ if (file.exists(modelsResults)) {
   }
 
   tbl <- as_tibble(out) %>% na.omit()
+  saveRDS(tbl, paste0(path.eval, "tbl.rep.rds"))
+}
+
+
+
+modelsResults.avg <- paste0(path.eval, "tbl.rds")
+if (file.exists(modelsResults.avg)) {
+  print("načítám existující tbl")
+  tbl <- readRDS(modelsResults.avg)
+} else {
+
+
+  # rozparsování verzí do samostatných částí
+  tbl %<>%
+    ungroup() %>%
+    separate_wider_delim(version, "_", names = c("method", "bgSource", "clip"), too_few = "align_start", cols_remove = FALSE)
+
+  # tbl.orig  <- tbl
+
+  # průměry z replikací
+  tbl.avg <- tbl %>%
+    group_by(version, adjust, tune.args, species) %>%
+    summarise_if(is.numeric, mean, na.rm = TRUE)
+  # vyloučené sloupce doplním znovu zpět
+  summarised.not <- setdiff(names(tbl), names(tbl.avg)) # odstranit sloupec rep - nedává smysl
+  tbl.not <- tbl %>%
+    group_by(version, adjust, tune.args, species) %>%
+    slice_head(n = 1) %>%
+    ungroup() %>%
+    dplyr::select(all_of(summarised.not))
+
+  tbl.avg %<>% add_column(tbl.not)
+
+  tbl <- tbl.avg
+  tbl %<>% ungroup() %>% mutate(id = row_number())
   saveRDS(tbl, paste0(path.eval, "tbl.rds"))
 }
 
-tbl %<>% mutate(id = row_number())
-
-# omylem navíc, jsou zbytečné, stejné jako verze bez clipu, odstraňuji (přístě už yse neměly generovat, opraveno)
-remove.dupl <- c("area_ssos_clip.ssos", "area_ssos.2_clip.ssos.2")
-tbl %<>% filter(version %notin% remove.dupl)
-
-# rozparsování verzí do samostatných částí
-tbl %<>%
-  ungroup() %>%
-  separate_wider_delim(version, "_", names = c("method", "bgSource", "clip"), too_few = "align_start", cols_remove = FALSE)
-
+ss <- "-all"
+selection <- c("kss_tgob", "kss_topS.50", "kss_topS.10", "kss_ssos.0", "kss_ssos.1", "kss_ssos.2", "kss_ssos.0.topS50", "kss_ssos.0.topS10")
 # random (null) verze k porovnání
+tbl.null.ids <- tbl %>% filter(bgSource == "un" & adjust == "0")
 
-tbl.null.ids <-  tbl %>%  filter(bgSource == "un" & adjust == "0") 
-
-tbl.null <- tbl.null.ids  %>%
+tbl.null <- tbl.null.ids %>%
   group_by(species) %>%
   slice_max(AUC, with_ties = FALSE) %>%
   dplyr::select(AUC, species, id) %>%
@@ -162,64 +188,118 @@ tbl.all %<>% left_join(tbl.null, by = c("species")) %>%
 # ggsave(paste0(path.eval, "duplORnot.png"))
 
 
+#
+##### # jen druhy co mají smysl... + bych měl možná i dofiltrovat null nad 50%?
+#
+# tbl.all %<>% filter(AUC >= 0.7)
+# jen druhy do 800 occs
+# tbl.all %<>% filter(occs.n < 800)
+
 
 tbl.all.median <- tbl.all %>%
+  ungroup() %>%
   group_by(version) %>%
   summarise(AUCdiffMedian = median(AUCdiff), AUCdiffQ_025 = quantile(AUCdiff, 0.25), AUCdiffQ_020 = quantile(AUCdiff, 0.20), AUCdiffQ_010 = quantile(AUCdiff, 0.10), AUCdiffQ_005 = quantile(AUCdiff, 0.05)) %>%
   dplyr::select(AUCdiffMedian, AUCdiffQ_025, AUCdiffQ_020, AUCdiffQ_010, AUCdiffQ_005, version) %>%
   ungroup() %>%
   arrange(AUCdiffMedian)
 
-
+# tbl.all %>% filter( is.na(AUC))
+# tbl.all %>% filter( is.na(AUCdiff))
 
 tbl.all %<>% left_join(tbl.all.median, by = "version")
 
-
+tbl.all.orig <- tbl.all
 # vnucení řazení podle mediánu
 version_ordered <- with(droplevels(tbl.all), reorder(version, AUCdiffMedian))
 tbl.all <- droplevels(tbl.all)
 tbl.all$version <- factor(tbl.all$version, levels = levels(version_ordered))
 
+
+# tbl.all %<>% mutate(version = fct_reorder(version, AUCdiffMedian))
+
+
 # !!! dočasná výjimka
-tbl.all %<>% filter(version != "kss_buffer") # vychází extrémně špatně, nějaký problém jakým je vytvořena? Notno zkontrolovat...
+# tbl.all %<>% filter(version != "kss_buffer") # vychází extrémně špatně, nějaký problém jakým je vytvořena? Notno zkontrolovat...
+
+# boxplotCustom <- function(x) {
+#   r <- quantile(x, probs = c(0.10, 0.25, 0.5, 0.75, 0.90))
+#   names(r) <- c("ymin", "lower", "middle", "upper", "ymax")
+#   return(r)
+# }
 
 # a) vše
 ggplot(tbl.all %>% ungroup(), aes(x = version, y = AUCdiff)) +
-  geom_violin(draw_quantiles = c(0.05, 0.10, 0.25, 0.5, 0.75), trim = FALSE, size = 0.2) +
-  theme_light() +
-  theme(
-    legend.position = "none", text = element_text(size = 4),
-    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
-  ) +
-   scale_y_continuous(limits = c(-0.2, 0.3))
-ggsave(paste0(path.img, "tbl.simple.png"), width = 1500, height = 1000, units = "px")
-
-# b) 0.25
-ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_025 >= -0.01), aes(x = version, y = AUCdiff)) +
-  geom_violin(draw_quantiles = c(0.05, 0.10, 0.25, 0.5, 0.75), trim = FALSE, size = 0.2) +
+  # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
+  geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
+  geom_point(aes(y = AUCdiffQ_010), size = 0.01, color = "red", shape = 18) +
   theme_light() +
   theme(
     legend.position = "none", text = element_text(size = 4),
     panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
   )
-ggsave(paste0(path.img, "tbl.simple.Q025.png"), width = 1500, height = 1000, units = "px")
+ggsave(paste0(path.img, "tbl.simple", ss, ".png"), width = 1500, height = 1000, units = "px")
 
-# c) 0.10
-ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_010 >= -0.01), aes(x = version, y = AUCdiff)) +
-  geom_violin(draw_quantiles = c(0.05, 0.10, 0.25, 0.5, 0.75), trim = FALSE, size = 0.2) +
+
+# b)
+ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_025 >= 0.0), aes(x = version, y = AUCdiff)) +
+  # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
+  geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
+  geom_point(aes(y = AUCdiffQ_010), size = 0.01, color = "red", shape = 18) +
   theme_light() +
   theme(
     legend.position = "none", text = element_text(size = 4),
     panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
   )
-ggsave(paste0(path.img, "tbl.simple.Q010.png"), width = 1500, height = 1000, units = "px")
+ggsave(paste0(path.img, "tbl.simple.Q025", ss, ".png"), width = 1500, height = 1000, units = "px")
+
+
+# c)
+ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_020 >= 0.0), aes(x = version, y = AUCdiff)) +
+  # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
+  geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
+  geom_point(aes(y = AUCdiffQ_010), size = 0.01, color = "red", shape = 18) +
+  theme_light() +
+  theme(
+    legend.position = "none", text = element_text(size = 4),
+    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  )
+ggsave(paste0(path.img, "tbl.simple.Q020", ss, ".png"), width = 1500, height = 1000, units = "px")
+
+
+# d)
+ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_010 >= 0.0), aes(x = version, y = AUCdiff)) +
+  # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
+  geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
+  geom_point(aes(y = AUCdiffQ_010), size = 0.01, color = "red", shape = 18) +
+  theme_light() +
+  theme(
+    legend.position = "none", text = element_text(size = 4),
+    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  )
+ggsave(paste0(path.img, "tbl.simple.Q010", ss, ".png"), width = 1500, height = 1000, units = "px")
+
+# e)
+ggplot(tbl.all %>% ungroup() %>% filter(version %in% selection), aes(x = version, y = AUCdiff)) +
+  # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
+  geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
+  geom_point(aes(y = AUCdiffQ_010), size = 0.01, color = "red", shape = 18) +
+  theme_light() +
+  theme(
+    legend.position = "none", text = element_text(size = 4),
+    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  )
+ggsave(paste0(path.img, "tbl.simple.selection", ss, ".png"), width = 1500, height = 1000, units = "px")
+
 
 
 #####
-##### pozor, záleží i na tom, jestli je zhoršení z 90 na 80 nebo z 60 na 50!! Nebo zlepšení z 50 na 60 mě taky nemusí zajímat, a z 80 na 90 také ne... 
+##### pozor, záleží i na tom, jestli je zhoršení z 90 na 80 nebo z 60 na 50!! Nebo zlepšení z 50 na 60 mě taky nemusí zajímat, a z 80 na 90 také ne...
 ##### Zohlednit! Stejně tak i udělat hranici 0.75 - dofiltrovat, neúspěšné druhy mě také nezajímají!!!
 #####
 
@@ -250,11 +330,11 @@ ggplot(tbl.all %>% ungroup(), aes(occs.n, AUCdiff)) +
     panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
   ) +
   facet_wrap(~version)
-ggsave(paste0(path.img, "tbl.trend-prevalence.png"), width = 2000, height = 1500, units = "px")
+ggsave(paste0(path.img, "tbl.trend-prevalence", ss, ".png"), width = 2000, height = 1500, units = "px")
 
 
 # b) 0.25
-ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_025 >= -0.01), aes(occs.n, AUCdiff)) +
+ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_025 >= 0.0), aes(occs.n, AUCdiff)) +
   geom_point(aes(colour = factor(version)), size = 0.05) +
   geom_smooth(method = loess, size = 0.2) +
   theme_light() +
@@ -263,12 +343,10 @@ ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_025 >= -0.01), aes(occs.n, AUCd
     panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
   ) +
   facet_wrap(~version)
-ggsave(paste0(path.img, "tbl.trend-prevalence.Q025.png"), width = 2000, height = 1500, units = "px")
+ggsave(paste0(path.img, "tbl.trend-prevalence.Q025", ss, ".png"), width = 2000, height = 1500, units = "px")
 
-
-# c) 0.10
-
-ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_010 >= -0.01), aes(occs.n, AUCdiff)) +
+# c) 0.20
+ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_020 >= 0.0), aes(occs.n, AUCdiff)) +
   geom_point(aes(colour = factor(version)), size = 0.05) +
   geom_smooth(method = loess, size = 0.2) +
   theme_light() +
@@ -277,11 +355,12 @@ ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_010 >= -0.01), aes(occs.n, AUCd
     panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
   ) +
   facet_wrap(~version)
-ggsave(paste0(path.img, "tbl.trend-prevalence.Q010.png"), width = 2000, height = 1500, units = "px")
+ggsave(paste0(path.img, "tbl.trend-prevalence.Q020", ss, ".png"), width = 2000, height = 1500, units = "px")
 
 
-# d) výběr
-ggplot(tbl.all %>% ungroup() %>% filter(version %in% c("kss_tgob", "kss_ssos", "kss_topS.50")), aes(occs.n, AUCdiff)) +
+# d) 0.10
+
+ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_010 >= 0.0), aes(occs.n, AUCdiff)) +
   geom_point(aes(colour = factor(version)), size = 0.05) +
   geom_smooth(method = loess, size = 0.2) +
   theme_light() +
@@ -290,7 +369,20 @@ ggplot(tbl.all %>% ungroup() %>% filter(version %in% c("kss_tgob", "kss_ssos", "
     panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
   ) +
   facet_wrap(~version)
-ggsave(paste0(path.img, "tbl.trend-prevalence.vyber.png"), width = 3000, height = 1500, units = "px")
+ggsave(paste0(path.img, "tbl.trend-prevalence.Q010", ss, ".png"), width = 2000, height = 1500, units = "px")
+
+
+# e) výběr
+ggplot(tbl.all %>% ungroup() %>% filter(version %in% selection), aes(occs.n, AUCdiff)) +
+  geom_point(aes(colour = factor(version)), size = 0.05) +
+  geom_smooth(method = loess, size = 0.2) +
+  theme_light() +
+  theme(
+    legend.position = "none", text = element_text(size = 6),
+    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
+  ) +
+  facet_wrap(~version)
+ggsave(paste0(path.img, "tbl.trend-prevalence.selection", ss, ".png"), width = 3000, height = 1500, units = "px")
 
 
 

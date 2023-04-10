@@ -37,10 +37,10 @@ gcfl <- function() {
 } # https://stackoverflow.com/a/55322344
 
 path.wd <- paste0(gcfl(), "/")
+# "C:\Program Files\R\R-4.2.1\bin\x64\Rscript.exe" "D:\PersonalWork\Balej\v2\RP\RP\R\ndopTGOBeval.R" 1
 
-# "C:\Program Files\R\R-4.2.1\bin\x64\Rscript.exe" "C:\Users\petr\Documents\2023-03-20\RP\RP\R\ndopTGOBeval.R"
 # Rscript /mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/R/ndopTGOBeval.R
-# "C:\Program Files\R\R-4.1.2\bin\x64\Rscript.exe" "C:\Users\balej\Documents\2023-03-29\RP\RP\R\ndopTGOBeval.R" 1
+# "C:\Program Files\R\R-4.1.2\bin\x64\Rscript.exe" "C:\Users\balej\Documents\2023-04-06\RP\RP\R\ndopTGOBeval.R" 1
 
 # nastavit working directory
 # path.wd <- "/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/RP/" # "D:/PERSONAL_DATA/pb/RP20230313/RP/RP/"
@@ -51,7 +51,7 @@ source(paste0(path.wd, "shared.R"))
 path.rgee <- paste0(path.wd, "../../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
 source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.lsd <- paste0(path.prep, "lsd/")
-path.models <- paste0(path.wd, "../../../modelsExport37/all/")
+path.models <- paste0(path.prep, "ndopTGOB/")
 path.eval <- paste0(path.prep, "ndopTGOBeval/")
 ############
 # inputs
@@ -69,7 +69,7 @@ lsd.pa.centroids <- readRDS(paste0(path.lsd, "lsd.pa.centroids.rds")) %>% filter
 # settings
 ############
 
-ndop.fs <- list("groups" = 3, "version" = "v1")
+ndop.fs <- list("groups" = 1, "version" = "v1")
 
 ############
 # execution
@@ -102,6 +102,7 @@ for (fpath in rds_list) {
     rds.l <- list()
     # dočasně rozdělené do dvou částí, nutno spojit:
     rds.l <- readRDS(fpath)
+    bn <- basename(fpath)
     # rds.l2 <- readRDS(str_replace(fpath, "skill", "skillb")) # !!! zakomentovat
 
     sp <- names(rds.l)
@@ -130,17 +131,26 @@ for (fpath in rds_list) {
             print("adjust: ____________")
             print(adjust)
             second <- TRUE
+
+            if (is.logical(rds.l[[sp]][[version]][[adjust]])) {
+                # nékdy daný adjust nebyl upočitatelný a nic tam není...
+                next
+            }
+
             for (layer in names(rds.l[[sp]][[version]][[adjust]]@predictions)) {
+                ev <- NA
+
                 print(layer)
                 r.temp <- rds.l[[sp]][[version]][[adjust]]@predictions[[layer]]
-                rds.r[[sp]][[version]][[adjust]][[layer]] <- r.temp
+                # rds.r[[sp]][[version]][[adjust]][[layer]] <- r.temp
                 ex.predicted <- extract(r.temp, st_coordinates(lsd.temp))
-                ev <- NA
+
                 #
                 # dopočíst a přidat další metriky z performance() (rgee)!!!
                 # tam ale není nic co zohledňuje tn tp (bez poměru k fp)
                 #
 
+                # _přidat_ partial pROC verzi!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 if (inherits(try({
                     ev <- sdm::evaluates(lsd.temp$presence, ex.predicted)
                 }), "try-error")) {
@@ -172,13 +182,14 @@ for (fpath in rds_list) {
 
             occs <- rds.l[[sp]][[version]][[adjust]]@occs
             temp.t$occs.n <- nrow(occs)
-            temp.t$occs.wkt <- st_as_text(st_combine(occs %>% st_as_sf(coords = c("longitude", "latitude"), crs = 4326)))
+
             temp.t$bg.n <- nrow(rds.l[[sp]][[version]][[adjust]]@bg)
             # LSD
             temp.t$p.n <- nrow(lsd.temp %>% filter(presence == 1))
             temp.t$a.n <- nrow(lsd.temp %>% filter(presence == 0))
-            temp.t$p.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 1)))
-            temp.t$a.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 0)))
+            # temp.t$p.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 1)))
+            # temp.t$a.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 0)))
+            # temp.t$occs.wkt <- st_as_text(st_combine(occs %>% st_as_sf(coords = c("longitude", "latitude"), crs = 4326)))
 
             if (first) {
                 first <- FALSE
@@ -190,8 +201,12 @@ for (fpath in rds_list) {
         }
     }
     # ukládat per species - nutno - jinak je výsledné rds s rastery predikcí extrémně velké a nenačitatelné/neuložitelné
-    saveRDS(out.t, paste0(path.eval, "ssos.t_", sp, "_", as.character(cmd_arg), ".rds")) # !!! nové názvy, nepřepsat původní
-    saveRDS(rds.r, paste0(path.eval, "ssos.r_", sp, "_", as.character(cmd_arg), ".rds")) # !!!
+    # saveRDS(out.t, paste0(path.eval, "ssos.t_", sp, "_", as.character(cmd_arg), ".rds")) # !!! nové názvy, nepřepsat původní
+    # saveRDS(rds.r, paste0(path.eval, "ssos.r_", sp, "_", as.character(cmd_arg), ".rds")) # !!!
+
+    saveRDS(out.t, paste0(path.eval, "t_", bn)) # !!! nové názvy, nepřepsat původní
+    # neukládám, mám v původním rds s modely, bylo by duplicitní
+    # saveRDS(rds.r, paste0(path.eval, "r_",  bn)) # !!!
 }
 
 

@@ -469,10 +469,7 @@ for (rep in 1:ndop.fs$replicates) {
         bgSources.ssos <- append(bgSources.ssos.temp1, bgSources.ssos.temp2)
 
 
-        kss <- list(
-            "cz" = predictors[[1]],
-            "buffer" = predictors.ssos.buffer
-        )
+
 
         # ze všech fixy
         bgSources.ssos.fix <- list()
@@ -495,69 +492,107 @@ for (rep in 1:ndop.fs$replicates) {
         bgSources.all.fix <- append(bgSources.fix, bgSources.ssos.fix)
 
 
+        # rastery z fixů
+        predictors.v <- list()
+        for (bgSourcesName in names(bgSources.all.fix)) {
+            predictors.v[[bgSourcesName]] <- mask(predictors[[1]], bgSources.all.fix[[bgSourcesName]])
+        }
+
+
+        kss <- predictors.v
+        kss$cz <- predictors[[1]]
+
+        # kss <- list(
+        #   "cz" = predictors[[1]]
+        #   # ,"buffer" = predictors.ssos.buffer
+        # )
+
+
         print("start sampling variant BG")
         #
         # KSS
         #
-        for (bgSourcesName in names(bgSources.all)) {
-            id <- paste(c("kss", bgSourcesName), collapse = "_")
-            collector.temp <- smoothingRP(kss[["cz"]], ndop.fs$adjusts, bgSources.all[[bgSourcesName]], nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster)
-            collector[[id]] <- collector.temp
-        }
-        # # buffer
-        id <- paste(c("kss", "buffer"), collapse = "_")
-        collector.temp <- smoothingRP(kss[["buffer"]], c(0.1, 1, 4), pres, nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster) # vizuální kontrola!!!
-        collector[[id]] <- collector.temp
 
-        #
-        # RSS - ne z ssos (může být hodně málo... - stačí area_ssos.x)
-        #
-
-        for (bgSourcesName in names(bgSources.all.fix)) {
-            if (bgSourcesName %in% c("ssos", "ssos.2", "ssos.top")) {
+        for (kssName in names(kss)) {
+            if (str_detect(kssName, "top")) {
                 next
             }
-            id <- paste(c("rss", bgSourcesName), collapse = "_")
-            collector.temp <- list()
-            collector.temp[["bg"]][["0"]] <- generateRPall(bgSources.all.fix[[bgSourcesName]], nBackRatio = ndop.fs$bgRatio)
-            collector[[id]] <- collector.temp
+
+            print("raster kss: --------")
+            print(kssName)
+            for (bgSourcesName in names(bgSources.all)) {
+                if (str_detect(kssName, "ssos.0") & (str_detect(bgSourcesName, "ssos.1") | str_detect(bgSourcesName, "ssos.2"))) {
+                    next
+                }
+                if (str_detect(kssName, "ssos.1") & (str_detect(bgSourcesName, "ssos.0") | str_detect(bgSourcesName, "ssos.2"))) {
+                    next
+                }
+                if (str_detect(kssName, "ssos.2") & (str_detect(bgSourcesName, "ssos.0") | str_detect(bgSourcesName, "ssos.1"))) {
+                    next
+                }
+
+                print("bg source:")
+                print(bgSourcesName)
+                id <- paste(c(kssName, bgSourcesName), collapse = "_")
+                collector.temp <- smoothingRP(kss[[kssName]], ndop.fs$adjusts, bgSources.all[[bgSourcesName]], nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster)
+                collector[[id]] <- collector.temp
+            }
         }
-        # # buffer
-        id <- paste(c("rss", "buffer"), collapse = "_")
-        collector.temp <- list()
-        collector.temp[["bg"]][["0"]] <- generateRPall(kss[["buffer"]], nBackRatio = ndop.fs$bgRatio) # vizuální kontrola!!!
-        collector[[id]] <- collector.temp
+        # # # buffer
+        # id <- paste(c("kss", "buffer"), collapse = "_")
+        # collector.temp <- smoothingRP(kss[["buffer"]], c(0.1, 1, 4), pres, nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster) # vizuální kontrola!!!
+        # collector[[id]] <- collector.temp
+
+        # #
+        # # RSS - ne z ssos (může být hodně málo... - stačí area_ssos.x)
+        # #
+
+        # for (bgSourcesName in names(bgSources.all.fix)) {
+        #     if (bgSourcesName %in% c("ssos", "ssos.2", "ssos.top")) {
+        #         next
+        #     }
+        #     id <- paste(c("rss", bgSourcesName), collapse = "_")
+        #     collector.temp <- list()
+        #     collector.temp[["bg"]][["0"]] <- generateRPall(bgSources.all.fix[[bgSourcesName]], nBackRatio = ndop.fs$bgRatio)
+        #     collector[[id]] <- collector.temp
+        # }
+        # # # buffer
+        # id <- paste(c("rss", "buffer"), collapse = "_")
+        # collector.temp <- list()
+        # collector.temp[["bg"]][["0"]] <- generateRPall(kss[["buffer"]], nBackRatio = ndop.fs$bgRatio) # vizuální kontrola!!!
+        # collector[[id]] <- collector.temp
 
 
         #
         # area
         #
 
-        for (bgSourcesName in names(bgSources.all.fix)) {
-            id <- paste(c("area", bgSourcesName), collapse = "_")
-            collector.temp <- list()
-            collector.temp[["bg"]][["0"]] <- bgSources.all.fix[[bgSourcesName]]
-            collector[[id]] <- collector.temp
-        }
-        # # buffer
-        id <- paste(c("area", "buffer"), collapse = "_")
-        collector.temp <- list()
-        collector.temp[["bg"]][["0"]] <- st_as_sf(rasterToPoints(kss[["buffer"]], spatial = TRUE)) %>% dplyr::select(-everything()) # vizuální kontrola!!!
-        collector[[id]] <- collector.temp
+        # for (bgSourcesName in names(bgSources.all.fix)) {
+        #     id <- paste(c("area", bgSourcesName), collapse = "_")
+        #     collector.temp <- list()
+        #     collector.temp[["bg"]][["0"]] <- bgSources.all.fix[[bgSourcesName]]
+        #     collector[[id]] <- collector.temp
+        # }
+
+        # # # buffer
+        # id <- paste(c("area", "buffer"), collapse = "_")
+        # collector.temp <- list()
+        # collector.temp[["bg"]][["0"]] <- st_as_sf(rasterToPoints(kss[["buffer"]], spatial = TRUE)) %>% dplyr::select(-everything()) # vizuální kontrola!!!
+        # collector[[id]] <- collector.temp
 
         #
         # un je fix sám o sobě, přidám
         #
-        id <- paste(c("rss", "un"), collapse = "_")
+        id <- paste(c("cz", "un"), collapse = "_")
         collector[[id]][["bg"]][["0"]] <- null.default
 
 
-        # thinning  presencí pro UN
-        for (thinDist in sq2rad.dist.range) {
-            occs.thinned <- ecospat.occ.desaggregation(xy = tgob.trad.tm.df, min.dist = thinDist, by = NULL)
-            thinDist <- as.character(thinDist)
-            collector.thin[[id]][[thinDist]] <- occs.thinned %>% st_as_sf(coords = c("x", "y"), crs = 4326)
-        }
+        # # thinning  presencí pro UN
+        # for (thinDist in sq2rad.dist.range) {
+        #     occs.thinned <- ecospat.occ.desaggregation(xy = tgob.trad.tm.df, min.dist = thinDist, by = NULL)
+        #     thinDist <- as.character(thinDist)
+        #     collector.thin[[id]][[thinDist]] <- occs.thinned %>% st_as_sf(coords = c("x", "y"), crs = 4326)
+        # }
 
 
         # ze všech fixů (skoro) udělat masky pro clip
@@ -565,43 +600,44 @@ for (rep in 1:ndop.fs$replicates) {
         # přidání clip verze tam kde dává smysl
         #
 
-        ### čím clipuju
-        for (idc in names(collector)) {
-            id.namesc <- unlist(strsplit(idc, "_"))
-
-            # nemá smysl clipovat jiné než celorepublikové varianty (ostatní už jsou samy o sobě nějakým způsobem clipnuté)
-            # neclipuju area+ssos.x
-            if ("area" == id.namesc[1] & "buffer" != id.namesc[2] & "tgob" != id.namesc[2] & !str_detect(id.namesc[2], "top") & is.na(id.namesc[3])) {
-                for (adjustc in names(collector[[idc]][["bg"]])) {
-                    print("clip čím *****************************")
-                    print(idc)
-                    ssos.mask <- mask(predictors[[1]], collector[[idc]][["bg"]][[adjustc]])
-
-                    ### co clipuju
-                    for (id in names(collector)) {
-                        id.names <- unlist(strsplit(id, "_"))
-                        if ((id.namesc[2] == id.names[2]) | (str_detect(id.namesc[2], "ssos") & str_detect(id.names[2], "ssos"))) {
-                            # neclipuju sebe sama a ssos vzájemně
-                            next
-                        }
-
-                        if ("kss" == id.names[1] & "buffer" != id.names[2] & is.na(id.names[3])) {
-                            for (adjust in names(collector[[id]][["bg"]])) {
-                                print("clip čeho ******")
-                                print(id)
-                                ex.temp <- extract(ssos.mask, st_coordinates(collector[[id]][["bg"]][[adjust]]))
-                                collector[[paste0(id, "_", id.namesc[2])]][["bg"]][[adjust]] <- collector[[id]][["bg"]][[adjust]][!is.na(ex.temp), ]
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        # ### čím clipuju
+        # for (idc in names(collector)) {
+        #     id.namesc <- unlist(strsplit(idc, "_"))
+        #
+        #     # nemá smysl clipovat jiné než celorepublikové varianty (ostatní už jsou samy o sobě nějakým způsobem clipnuté)
+        #     # neclipuju area+ssos.x
+        #     if ("area" == id.namesc[1] & "buffer" != id.namesc[2] & "tgob" != id.namesc[2] & !str_detect(id.namesc[2], "top") & is.na(id.namesc[3])) {
+        #         for (adjustc in names(collector[[idc]][["bg"]])) {
+        #             print("clip čím *****************************")
+        #             print(idc)
+        #             ssos.mask <- mask(predictors[[1]], collector[[idc]][["bg"]][[adjustc]])
+        #
+        #             ### co clipuju
+        #             for (id in names(collector)) {
+        #                 id.names <- unlist(strsplit(id, "_"))
+        #                 if ((id.namesc[2] == id.names[2]) | (str_detect(id.namesc[2], "ssos") & str_detect(id.names[2], "ssos"))) {
+        #                     # neclipuju sebe sama a ssos vzájemně
+        #                     next
+        #                 }
+        #
+        #                 if ("kss" == id.names[1] & "buffer" != id.names[2] & is.na(id.names[3])) {
+        #                     for (adjust in names(collector[[id]][["bg"]])) {
+        #                         print("clip čeho ******")
+        #                         print(id)
+        #                         ex.temp <- extract(ssos.mask, st_coordinates(collector[[id]][["bg"]][[adjust]]))
+        #                         collector[[paste0(id, "_", id.namesc[2])]][["bg"]][[adjust]] <- collector[[id]][["bg"]][[adjust]][!is.na(ex.temp), ]
+        #                     }
+        #                 }
+        #             }
+        #         }
+        #     }
+        # }
 
         gc()
         # run vsech variant BG s ENMeval
         for (id in names(collector)) {
             id.names <- unlist(strsplit(id, "_"))
+
             print(id)
             for (adjust in names(collector[[id]][["bg"]])) {
                 print(adjust)
@@ -629,37 +665,37 @@ for (rep in 1:ndop.fs$replicates) {
                     e.mx.all[[druh]][[id]][[adjust]] <- NA
                 }
 
-                # varianta s thinningem presencí přidaných do UN
-                if ("un" == id.names[2]) {
-                    print("thin:")
-                    for (thinDist in names(collector.thin[[id]])) {
-                        df.temp.thin <- as.data.frame(st_coordinates(collector.thin[[id]][[thinDist]]))
-                        names(df.temp.thin) <- ll
-                        # podstrčit thinning presence místo původních
-                        print("měním presenční dataset pro thinnovací verze")
+                # # varianta s thinningem presencí přidaných do UN
+                # if ("un" == id.names[2]) {
+                #     print("thin:")
+                #     for (thinDist in names(collector.thin[[id]])) {
+                #         df.temp.thin <- as.data.frame(st_coordinates(collector.thin[[id]][[thinDist]]))
+                #         names(df.temp.thin) <- ll
+                #         # podstrčit thinning presence místo původních
+                #         print("měním presenční dataset pro thinnovací verze")
 
-                        block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
+                #         block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
 
-                        if (inherits(try({
-                            e.mx.all[[druh]][[id]][[thinDist]] <- ENMevaluate(
-                                user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
-                                occs = df.temp.thin,
-                                envs = predictors,
-                                bg = bg.temp,
-                                algorithm = "maxnet", partitions = "user",
-                                # partition.settings = list("kfolds" = 3),
-                                tune.args = tune.args,
-                                other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
-                            )
-                        }), "try-error")) {
-                            e.mx.all[[druh]][[id]][[thinDist]] <- NA
-                        }
-                    }
-                }
+                #         if (inherits(try({
+                #             e.mx.all[[druh]][[id]][[thinDist]] <- ENMevaluate(
+                #                 user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
+                #                 occs = df.temp.thin,
+                #                 envs = predictors,
+                #                 bg = bg.temp,
+                #                 algorithm = "maxnet", partitions = "user",
+                #                 # partition.settings = list("kfolds" = 3),
+                #                 tune.args = tune.args,
+                #                 other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
+                #             )
+                #         }), "try-error")) {
+                #             e.mx.all[[druh]][[id]][[thinDist]] <- NA
+                #         }
+                #     }
+                # }
             }
         }
 
-        saveRDS(e.mx.all, paste0(path.tgob, "ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
+        saveRDS(e.mx.all, paste0(path.tgob, "1ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
         gc()
     }
 }
