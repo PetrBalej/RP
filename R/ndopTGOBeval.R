@@ -69,7 +69,7 @@ lsd.pa.centroids <- readRDS(paste0(path.lsd, "lsd.pa.centroids.rds")) %>% filter
 # settings
 ############
 
-ndop.fs <- list("groups" = 1, "version" = "v1")
+ndop.fs <- list("groups" = 5, "version" = "v1")
 
 ############
 # execution
@@ -82,10 +82,11 @@ lsd.pa.centroids.species <- unlist(unique(lsd.pa.centroids$TaxonNameLAT))
 rds_list <-
     list.files(
         path.models,
-        pattern = paste0("^ssos_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
+        pattern = paste0("^2ssos_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
         ignore.case = TRUE,
         full.names = TRUE
     )
+# rds_list <- readRDS("D:/PersonalWork/Balej/v2/RP/dataPrep/missing.rds")
 
 # rozdělení RDS do více skupin pro paralelní zpracování
 perGroup <- ceiling(length(rds_list) / ndop.fs$groups)

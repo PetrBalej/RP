@@ -106,7 +106,7 @@ ndop.fs <- list(
     "adjusts" = c(0.1, 0.5, 1, 2, 3, 4),
     "tuneArgs" = list(fc = c("L", "LQ"), rm = c(1, 2, 3, 5, 10)),
     "bgRatio" = 1 / 10,
-    "speciesPerGroup" = 3, "speciesOccMin" = 30,
+    "speciesPerGroup" = 2, "speciesOccMin" = 30,
     "sq2rad" = c((1 / 6) / 4, 0.1 / 4), # kvadráty KFME 2rad, xy velikost ve stupních
     "sq2radDist" = c(1:5),
     "replicates" = 3,
@@ -115,7 +115,10 @@ ndop.fs <- list(
     "versionNames" = vn, "versionSmooting" = vf
 )
 # dopočty
-ndop.fs$bg <- round(czechia.sq * ndop.fs$bgRatio)
+ndop.fs$bg <- round(cellStats(!is.na(predictors[[1]]), sum) * ndop.fs$bgRatio)
+# !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!!
+ndop.fs$bgRatio <- ndop.fs$bg # dočasně přepisuju - normálně dělat obě varianty!!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!! !!!!
+
 
 ############
 # execution
@@ -172,8 +175,22 @@ generateRPall <- function(RasterLayer_OR_sf_POINT, nBackRatio = 1 / 10, prob = F
         return(out)
     }
 
-    total <- nrow(background.points)
-    proportion <- round(total * nBackRatio)
+    if (nBackRatio > 1) {
+        # neudávám poměr ale přesný počet
+        total <- nrow(background.points)
+        if (nBackRatio > total) {
+            # nemůžu nasamplovat více
+            proportion <- total
+        } else {
+            proportion <- nBackRatio
+        }
+    } else {
+        # udávám poměr z rasteru nebo bodů
+        total <- nrow(background.points)
+        proportion <- round(total * nBackRatio)
+    }
+
+
 
     probs <- NULL
     if (prob == TRUE) {
@@ -695,7 +712,7 @@ for (rep in 1:ndop.fs$replicates) {
             }
         }
 
-        saveRDS(e.mx.all, paste0(path.tgob, "1ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
+        saveRDS(e.mx.all, paste0(path.tgob, "2ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
         gc()
     }
 }

@@ -134,7 +134,7 @@ if (file.exists(modelsResults.avg)) {
   # rozparsování verzí do samostatných částí
   tbl %<>%
     ungroup() %>%
-    separate_wider_delim(version, "_", names = c("method", "bgSource", "clip"), too_few = "align_start", cols_remove = FALSE)
+    separate_wider_delim(version, "_", names = c("method", "bgSource"), too_few = "align_start", cols_remove = FALSE)
 
   # tbl.orig  <- tbl
 
@@ -158,7 +158,7 @@ if (file.exists(modelsResults.avg)) {
 }
 
 ss <- "-all"
-selection <- c("kss_tgob", "kss_topS.50", "kss_topS.10", "kss_ssos.0", "kss_ssos.1", "kss_ssos.2", "kss_ssos.0.topS50", "kss_ssos.0.topS10")
+selection <- c("cz_tgob", "cz_topS.50", "cz_topS.10", "ssos.0_ssos.0", "ssos.1.001_ssos.1.001", "ssos.2.001_ssos.2.001") # , "kss_ssos.0.topS50", "kss_ssos.0.topS10"
 # random (null) verze k porovnání
 tbl.null.ids <- tbl %>% filter(bgSource == "un" & adjust == "0")
 
