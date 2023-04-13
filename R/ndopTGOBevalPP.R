@@ -158,7 +158,9 @@ if (file.exists(modelsResults.avg)) {
 }
 
 ss <- "-all"
-selection <- c("cz_tgob", "cz_topS.50", "cz_topS.10", "ssos.0_ssos.0", "ssos.1.001_ssos.1.001", "ssos.2.001_ssos.2.001") # , "kss_ssos.0.topS50", "kss_ssos.0.topS10"
+# selection <- c("cz_tgob", "cz_topS.50", "cz_topS.10", "cz_ssos.0", "ssos.0_ssos.0", "cz_ssos.1.001", "ssos.1.001_ssos.1.001", "cz_ssos.0.topS50", "cz_ssos.0.topS10", "cz_ssos.1.001.topS10", "cz_ssos.2.001.topS10") #
+selection <- c("cz_tgob", "cz_topS.50", "cz_topS.10", "cz_ssos.0", "cz_ssos.1.001", "cz_ssos.1.001.topS10") #
+
 # random (null) verze k porovnání
 tbl.null.ids <- tbl %>% filter(bgSource == "un" & adjust == "0")
 
@@ -180,20 +182,24 @@ tbl.all %<>% left_join(tbl.null, by = c("species")) %>%
   group_by(species, version) %>%
   slice_max(AUCdiff, with_ties = FALSE)
 
-
-# # uniq vs. dupl - jsou rozdíly + dupld
-# ggplot(tbl2, aes(x = group, y = AUCdiff, fill = duplORnot)) +
-#   geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) +
-#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-# ggsave(paste0(path.eval, "duplORnot.png"))
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # ############
+# tbl.all2 <- tbl.all
+# tbl.all2 %<>% filter(version %in% selection) %>%
+#   group_by(species, version) %>%
+#   slice_max(AUCdiff, with_ties = FALSE) %>%
+#   filter(AUC >= 0.7) %>%
+#   filter(occs.n < 800) %>%
+#   group_by(version) %>%
+#   summarise(n = length(id.x))
 
 
 #
 ##### # jen druhy co mají smysl... + bych měl možná i dofiltrovat null nad 50%?
 #
-# tbl.all %<>% filter(AUC >= 0.7)
+#  tbl.all %<>% filter(AUC >= 0.7)
 # jen druhy do 800 occs
-# tbl.all %<>% filter(occs.n < 800)
+#  tbl.all %<>% filter(occs.n < 800)
 
 
 tbl.all.median <- tbl.all %>%
@@ -232,7 +238,8 @@ tbl.all$version <- factor(tbl.all$version, levels = levels(version_ordered))
 ggplot(tbl.all %>% ungroup(), aes(x = version, y = AUCdiff)) +
   # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
   geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-  geom_point(aes(y = AUCdiffQ_010), size = 0.01, color = "red", shape = 18) +
+  geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
+  geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
   theme_light() +
   theme(
     legend.position = "none", text = element_text(size = 4),
@@ -246,7 +253,8 @@ ggsave(paste0(path.img, "tbl.simple", ss, ".png"), width = 1500, height = 1000, 
 ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_025 >= 0.0), aes(x = version, y = AUCdiff)) +
   # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
   geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-  geom_point(aes(y = AUCdiffQ_010), size = 0.01, color = "red", shape = 18) +
+  geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
+  geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
   theme_light() +
   theme(
     legend.position = "none", text = element_text(size = 4),
@@ -260,7 +268,8 @@ ggsave(paste0(path.img, "tbl.simple.Q025", ss, ".png"), width = 1500, height = 1
 ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_020 >= 0.0), aes(x = version, y = AUCdiff)) +
   # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
   geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-  geom_point(aes(y = AUCdiffQ_010), size = 0.01, color = "red", shape = 18) +
+  geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
+  geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
   theme_light() +
   theme(
     legend.position = "none", text = element_text(size = 4),
@@ -274,7 +283,8 @@ ggsave(paste0(path.img, "tbl.simple.Q020", ss, ".png"), width = 1500, height = 1
 ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_010 >= 0.0), aes(x = version, y = AUCdiff)) +
   # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
   geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-  geom_point(aes(y = AUCdiffQ_010), size = 0.01, color = "red", shape = 18) +
+  geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
+  geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
   theme_light() +
   theme(
     legend.position = "none", text = element_text(size = 4),
@@ -287,7 +297,8 @@ ggsave(paste0(path.img, "tbl.simple.Q010", ss, ".png"), width = 1500, height = 1
 ggplot(tbl.all %>% ungroup() %>% filter(version %in% selection), aes(x = version, y = AUCdiff)) +
   # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
   geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-  geom_point(aes(y = AUCdiffQ_010), size = 0.01, color = "red", shape = 18) +
+  geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
+  geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
   theme_light() +
   theme(
     legend.position = "none", text = element_text(size = 4),
