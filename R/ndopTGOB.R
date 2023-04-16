@@ -104,7 +104,7 @@ vf <- list("1" = 1:8, "0" = 9)
 
 ndop.fs <- list(
     "adjusts" = c(0.1, 0.5, 1, 2, 3, 4),
-    "tuneArgs" = list(fc = c("L", "LQ"), rm = c(1, 2, 3, 5, 10)),
+    "tuneArgs" = list(fc = c("L", "LQ", "H", "LQH", "LQHP"), rm = c(0.5, 1, 2, 3, 4)),
     "bgRatio" = 1 / 10,
     "speciesPerGroup" = 2, "speciesOccMin" = 30,
     "sq2rad" = c((1 / 6) / 4, 0.1 / 4), # kvadráty KFME 2rad, xy velikost ve stupních
@@ -291,8 +291,9 @@ bgSources <- list(
     # "ssos" = tgob,
     # "ssos.2" = ssos,
     # "topA.10" = ndop.topAUTOR10, # pokrývají jen část ČR - nerovnoměrně, přestože mají značnou část nálezů
-    "topA.100" = ndop.topAUTOR100, "topS.10" = ndop.topDRUH10,
-    "topS.50" = ndop.topDRUH50
+    "topA100" = ndop.topAUTOR100,
+    "topS10" = ndop.topDRUH10
+    # "topS.50" = ndop.topDRUH50
 )
 
 # fix area
@@ -435,57 +436,57 @@ for (rep in 1:ndop.fs$replicates) {
 
 
         bgSources.ssos.temp1 <- list(
-            "ssos.0" = tgob,
-            "ssos.0.topS50" = tgob.top50,
-            "ssos.0.topS10" = tgob.top10,
-            "ssos.0.topA100" = tgob.top100,
-            "ssos.1.001" = ssos2_001.P,
-            "ssos.1.010" = ssos2_010.P,
+            "ssos" = tgob,
+            # "ssos.0.topS50" = tgob.top50,
+            "ssos.topS10" = tgob.top10,
+            "ssos.topA100" = tgob.top100,
+            "ssos2" = ssos2_001.P,
+            # "ssos.1.010" = ssos2_010.P,
             # "ssos.1.025" = ssos2_025.P,
-            "ssos.1.001.topS50" = ssos2_001.P.top50,
-            "ssos.1.010.topS50" = ssos2_010.P.top50,
-            "ssos.1.001.topS10" = ssos2_001.P.top10,
-            "ssos.1.010.topS10" = ssos2_010.P.top10,
-            "ssos.1.001.topA100" = ssos2_001.P.top100,
-            "ssos.1.010.topA100" = ssos2_010.P.top100
+            # "ssos.1.001.topS50" = ssos2_001.P.top50,
+            # "ssos.1.010.topS50" = ssos2_010.P.top50,
+            "ssos2.topS10" = ssos2_001.P.top10,
+            # "ssos.1.010.topS10" = ssos2_010.P.top10,
+            "ssos2.topA100" = ssos2_001.P.top100
+            # "ssos.1.010.topA100" = ssos2_010.P.top100
             # "ssos.1.025.topS50" = ssos2_025.P.top
         )
 
 
-        ### autorské bez jedničkových
-        ### autorské
+        # ### autorské bez jedničkových
+        # ### autorské
 
-        ssos.DRUH.AUTOR.ratio %<>% filter(POLE.n.sum > 1)
+        # ssos.DRUH.AUTOR.ratio %<>% filter(POLE.n.sum > 1)
 
-        ssos.DRUH.ratio.quantile <- unname(quantile(ssos.DRUH.AUTOR.ratio$ratio, probs = c(0.01, 0.10, 0.25))) #- asi nechci automaticky odstranit 1/4, jen lidi s nižším než 50% z SSOS poměru zastoupení druhu oproti ostatním druhům
+        # ssos.DRUH.ratio.quantile <- unname(quantile(ssos.DRUH.AUTOR.ratio$ratio, probs = c(0.01, 0.10, 0.25))) #- asi nechci automaticky odstranit 1/4, jen lidi s nižším než 50% z SSOS poměru zastoupení druhu oproti ostatním druhům
 
-        ssos2_001 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[1])
-        pres.au <- unique(ssos2_001$AUTOR)
-        ssos2_001.P <- ndopP %>% filter(AUTOR %in% pres.au)
-        ssos2_001.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
-        ssos2_001.P.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
+        # ssos2_001 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[1])
+        # pres.au <- unique(ssos2_001$AUTOR)
+        # ssos2_001.P <- ndopP %>% filter(AUTOR %in% pres.au)
+        # ssos2_001.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        # ssos2_001.P.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
 
-        ssos2_010 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[2])
-        pres.au <- unique(ssos2_010$AUTOR)
-        ssos2_010.P <- ndopP %>% filter(AUTOR %in% pres.au)
-        ssos2_010.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
-        ssos2_010.P.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
-
-
-        bgSources.ssos.temp2 <- list(
-            "ssos.2.001" = ssos2_001.P,
-            "ssos.2.010" = ssos2_010.P,
-            # "ssos.1.025" = ssos2_025.P,
-            "ssos.2.001.topS50" = ssos2_001.P.top50,
-            "ssos.2.010.topS50" = ssos2_010.P.top50,
-            "ssos.2.001.topS10" = ssos2_001.P.top10,
-            "ssos.2.010.topS10" = ssos2_010.P.top10
-            # "ssos.1.025.topS50" = ssos2_025.P.top
-        )
-
-        bgSources.ssos <- append(bgSources.ssos.temp1, bgSources.ssos.temp2)
+        # ssos2_010 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[2])
+        # pres.au <- unique(ssos2_010$AUTOR)
+        # ssos2_010.P <- ndopP %>% filter(AUTOR %in% pres.au)
+        # ssos2_010.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        # ssos2_010.P.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
 
 
+        # bgSources.ssos.temp2 <- list(
+        #     "ssos.2.001" = ssos2_001.P,
+        #     "ssos.2.010" = ssos2_010.P,
+        #     # "ssos.1.025" = ssos2_025.P,
+        #     "ssos.2.001.topS50" = ssos2_001.P.top50,
+        #     "ssos.2.010.topS50" = ssos2_010.P.top50,
+        #     "ssos.2.001.topS10" = ssos2_001.P.top10,
+        #     "ssos.2.010.topS10" = ssos2_010.P.top10
+        #     # "ssos.1.025.topS50" = ssos2_025.P.top
+        # )
+
+        # bgSources.ssos <- append(bgSources.ssos.temp1, bgSources.ssos.temp2)
+
+        bgSources.ssos <- bgSources.ssos.temp1
 
 
         # ze všech fixy
@@ -509,14 +510,15 @@ for (rep in 1:ndop.fs$replicates) {
         bgSources.all.fix <- append(bgSources.fix, bgSources.ssos.fix)
 
 
-        # rastery z fixů
-        predictors.v <- list()
-        for (bgSourcesName in names(bgSources.all.fix)) {
-            predictors.v[[bgSourcesName]] <- mask(predictors[[1]], bgSources.all.fix[[bgSourcesName]])
-        }
+        # # rastery z fixů
+        # predictors.v <- list()
+        # for (bgSourcesName in names(bgSources.all.fix)) {
+        #     predictors.v[[bgSourcesName]] <- mask(predictors[[1]], bgSources.all.fix[[bgSourcesName]])
+        # }
 
 
-        kss <- predictors.v
+        # kss <- predictors.v
+        kss <- list()
         kss$cz <- predictors[[1]]
 
         # kss <- list(
@@ -538,19 +540,20 @@ for (rep in 1:ndop.fs$replicates) {
             print("raster kss: --------")
             print(kssName)
             for (bgSourcesName in names(bgSources.all)) {
-                if (str_detect(kssName, "ssos.0") & (str_detect(bgSourcesName, "ssos.1") | str_detect(bgSourcesName, "ssos.2"))) {
-                    next
-                }
-                if (str_detect(kssName, "ssos.1") & (str_detect(bgSourcesName, "ssos.0") | str_detect(bgSourcesName, "ssos.2"))) {
-                    next
-                }
-                if (str_detect(kssName, "ssos.2") & (str_detect(bgSourcesName, "ssos.0") | str_detect(bgSourcesName, "ssos.1"))) {
-                    next
-                }
+                # if (str_detect(kssName, "ssos.0") & (str_detect(bgSourcesName, "ssos.1") | str_detect(bgSourcesName, "ssos.2"))) {
+                #     next
+                # }
+                # if (str_detect(kssName, "ssos.1") & (str_detect(bgSourcesName, "ssos.0") | str_detect(bgSourcesName, "ssos.2"))) {
+                #     next
+                # }
+                # if (str_detect(kssName, "ssos.2") & (str_detect(bgSourcesName, "ssos.0") | str_detect(bgSourcesName, "ssos.1"))) {
+                #     next
+                # }
 
                 print("bg source:")
                 print(bgSourcesName)
-                id <- paste(c(kssName, bgSourcesName), collapse = "_")
+                # id <- paste(c(kssName, bgSourcesName), collapse = "_")
+                id <- bgSourcesName
                 collector.temp <- smoothingRP(kss[[kssName]], ndop.fs$adjusts, bgSources.all[[bgSourcesName]], nBackRatio = ndop.fs$bgRatio, bgRaster = ndop.fs$bgRaster)
                 collector[[id]] <- collector.temp
             }
@@ -600,16 +603,17 @@ for (rep in 1:ndop.fs$replicates) {
         #
         # un je fix sám o sobě, přidám
         #
-        id <- paste(c("cz", "un"), collapse = "_")
+        # id <- paste(c("cz", "un"), collapse = "_")
+        id <- "un"
         collector[[id]][["bg"]][["0"]] <- null.default
 
 
-        # # thinning  presencí pro UN
-        # for (thinDist in sq2rad.dist.range) {
-        #     occs.thinned <- ecospat.occ.desaggregation(xy = tgob.trad.tm.df, min.dist = thinDist, by = NULL)
-        #     thinDist <- as.character(thinDist)
-        #     collector.thin[[id]][[thinDist]] <- occs.thinned %>% st_as_sf(coords = c("x", "y"), crs = 4326)
-        # }
+        # thinning  presencí pro UN
+        for (thinDist in sq2rad.dist.range) {
+            occs.thinned <- ecospat.occ.desaggregation(xy = tgob.trad.tm.df, min.dist = thinDist, by = NULL)
+            thinDist <- as.character(thinDist)
+            collector.thin[[id]][[thinDist]] <- occs.thinned %>% st_as_sf(coords = c("x", "y"), crs = 4326)
+        }
 
 
         # ze všech fixů (skoro) udělat masky pro clip
@@ -653,7 +657,7 @@ for (rep in 1:ndop.fs$replicates) {
         gc()
         # run vsech variant BG s ENMeval
         for (id in names(collector)) {
-            id.names <- unlist(strsplit(id, "_"))
+            # id.names <- unlist(strsplit(id, "_"))
 
             print(id)
             for (adjust in names(collector[[id]][["bg"]])) {
@@ -682,37 +686,37 @@ for (rep in 1:ndop.fs$replicates) {
                     e.mx.all[[druh]][[id]][[adjust]] <- NA
                 }
 
-                # # varianta s thinningem presencí přidaných do UN
-                # if ("un" == id.names[2]) {
-                #     print("thin:")
-                #     for (thinDist in names(collector.thin[[id]])) {
-                #         df.temp.thin <- as.data.frame(st_coordinates(collector.thin[[id]][[thinDist]]))
-                #         names(df.temp.thin) <- ll
-                #         # podstrčit thinning presence místo původních
-                #         print("měním presenční dataset pro thinnovací verze")
+                # varianta s thinningem presencí přidaných do UN
+                if ("un" == id) {
+                    print("thin:")
+                    for (thinDist in names(collector.thin[[id]])) {
+                        df.temp.thin <- as.data.frame(st_coordinates(collector.thin[[id]][[thinDist]]))
+                        names(df.temp.thin) <- ll
+                        # podstrčit thinning presence místo původních
+                        print("měním presenční dataset pro thinnovací verze")
 
-                #         block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
+                        block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
 
-                #         if (inherits(try({
-                #             e.mx.all[[druh]][[id]][[thinDist]] <- ENMevaluate(
-                #                 user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
-                #                 occs = df.temp.thin,
-                #                 envs = predictors,
-                #                 bg = bg.temp,
-                #                 algorithm = "maxnet", partitions = "user",
-                #                 # partition.settings = list("kfolds" = 3),
-                #                 tune.args = tune.args,
-                #                 other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
-                #             )
-                #         }), "try-error")) {
-                #             e.mx.all[[druh]][[id]][[thinDist]] <- NA
-                #         }
-                #     }
-                # }
+                        if (inherits(try({
+                            e.mx.all[[druh]][[id]][[thinDist]] <- ENMevaluate(
+                                user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
+                                occs = df.temp.thin,
+                                envs = predictors,
+                                bg = bg.temp,
+                                algorithm = "maxnet", partitions = "user",
+                                # partition.settings = list("kfolds" = 3),
+                                tune.args = tune.args,
+                                other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
+                            )
+                        }), "try-error")) {
+                            e.mx.all[[druh]][[id]][[thinDist]] <- NA
+                        }
+                    }
+                }
             }
         }
 
-        saveRDS(e.mx.all, paste0(path.tgob, "2ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
+        saveRDS(e.mx.all, paste0(path.tgob, "3ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
         gc()
     }
 }

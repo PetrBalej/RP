@@ -13,15 +13,15 @@ lapply(required_packages, require, character.only = TRUE)
 ############
 
 gcfl <- function() {
-    this_file <- commandArgs() %>%
-        tibble::enframe(name = NULL) %>%
-        tidyr::separate(col = value, into = c("key", "value"), sep = "=", fill = "right") %>%
-        dplyr::filter(key == "--file") %>%
-        dplyr::pull(value)
-    if (length(this_file) == 0) {
-        this_file <- rstudioapi::getSourceEditorContext()$path
-    }
-    return(dirname(this_file))
+  this_file <- commandArgs() %>%
+    tibble::enframe(name = NULL) %>%
+    tidyr::separate(col = value, into = c("key", "value"), sep = "=", fill = "right") %>%
+    dplyr::filter(key == "--file") %>%
+    dplyr::pull(value)
+  if (length(this_file) == 0) {
+    this_file <- rstudioapi::getSourceEditorContext()$path
+  }
+  return(dirname(this_file))
 } # https://stackoverflow.com/a/55322344
 
 path.wd <- paste0(gcfl(), "/")
@@ -156,15 +156,28 @@ if (file.exists(modelsResults.avg)) {
   tbl %<>% ungroup() %>% mutate(id = row_number())
   saveRDS(tbl, paste0(path.eval, "tbl.rds"))
 }
+auc.tr <- c(0.70, 0.75)
+
 
 ss <- "-all"
 # selection <- c("cz_tgob", "cz_topS.50", "cz_topS.10", "cz_ssos.0", "ssos.0_ssos.0", "cz_ssos.1.001", "ssos.1.001_ssos.1.001", "cz_ssos.0.topS50", "cz_ssos.0.topS10", "cz_ssos.1.001.topS10", "cz_ssos.2.001.topS10") #
-selection <- c("cz_tgob", "cz_topS.50", "cz_topS.10", "cz_ssos.0", "cz_ssos.1.001", "cz_ssos.1.001.topS10") #
+# selection <- c("cz_tgob", "cz_topS.50", "cz_topS.10", "cz_ssos.0", "cz_ssos.1.001", "cz_ssos.1.001.topS10") #
+# selection <- unique(tbl.all$version)
+
+# selection <- c("cz_tgob", "cz_topS.10", "ssos.0_ssos.0",  "cz_topA.100",  "ssos.0_ssos.0.topS10", "ssos.0_ssos.0.topA100", "cz_un")
+selection <- c("cz_tgob", "cz_topS.10", "cz_ssos.0", "cz_topA.100", "cz_ssos.0.topS10", "cz_ssos.0.topA100", "cz_un")
+# selection <- c("cz_tgob", "cz_topS.10", "cz_ssos.1.001",  "cz_topA.100",  "cz_ssos.1.001.topS10", "cz_ssos.1.001.topA100", "cz_un")
+# selection <- c("cz_tgob", "cz_topS.10", "cz_ssos.0",  "cz_topA.100", "cz_un")
+tbl %<>% filter(version %in% selection)
+
+
+# sp30 <- lsd.pa.centroids %>% group_by(TaxonNameLAT) %>% filter(sum(presence == 1) >= 30 ) %>%  filter(sum(presence == 0) >= 30 )
+# tbl %<>% filter(species %in% unique(sp30$TaxonNameLAT))
 
 # random (null) verze k porovnání
 tbl.null.ids <- tbl %>% filter(bgSource == "un" & adjust == "0")
 
-tbl.null <- tbl.null.ids %>%
+tbl.null.test <- tbl.null.ids %>%
   group_by(species) %>%
   slice_max(AUC, with_ties = FALSE) %>%
   dplyr::select(AUC, species, id) %>%
@@ -172,27 +185,213 @@ tbl.null <- tbl.null.ids %>%
   ungroup()
 
 
+tbl.null.val <- tbl.null.ids %>%
+  group_by(species) %>%
+  slice_max(auc.val.avg, with_ties = FALSE) %>%
+  dplyr::select(auc.val.avg, species, id) %>%
+  rename(auc.val_null = auc.val.avg) %>%
+  ungroup()
+
+
+
+
+
 # ostatní verze k ověření zbavené random null
 # tbl.all <- tbl %>% filter(version != "rss_un" && adjust != 0)  # funguje divně
-tbl.all <- tbl %>% filter(id %notin% tbl.null.ids$id) # v UN verzi zůstávají thinningy
+# tbl.all <- tbl %>% filter(id %notin% tbl.null.ids$id) # v UN verzi zůstávají thinningy
 
-# připojím random a spočtu rozdíl AUC
-tbl.all %<>% left_join(tbl.null, by = c("species")) %>%
-  mutate(AUCdiff = AUC - AUC_null) %>%
-  group_by(species, version) %>%
-  slice_max(AUCdiff, with_ties = FALSE)
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# # # ############
-# tbl.all2 <- tbl.all
-# tbl.all2 %<>% filter(version %in% selection) %>%
+
+# # připojím random a spočtu rozdíl AUC
+# tbl.all %<>% left_join(tbl.null, by = c("species")) %>%
+#   mutate(AUCdiff = AUC - AUC_null) %>%
 #   group_by(species, version) %>%
-#   slice_max(AUCdiff, with_ties = FALSE) %>%
-#   filter(AUC >= 0.7) %>%
-#   filter(occs.n < 800) %>%
-#   group_by(version) %>%
-#   summarise(n = length(id.x))
+#   slice_max(AUCdiff, with_ties = FALSE)
 
+
+
+# oficiál
+tbl %<>% left_join(tbl.null.test, by = c("species"), suffix = c("", "__AUC")) %>%
+  mutate(AUCdiff = AUC - AUC_null) %>%
+  group_by(species, version)
+
+tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg")) %>%
+  mutate(auc.valdiff = auc.val.avg - auc.val_null) %>%
+  group_by(species, version)
+
+
+
+# jsou auc.test.avg a AUC u zvolených metod korelované? - až nad filtrovaným datasetem: AUC?
+# měl bych ale spočíst i omision rate nad LSD - tam by měl být smysluplný?
+
+
+
+# tbl.all.official <- tbl.all  %>%   group_by(species, version) %>% filter(AUC >= 0.70) %>% filter(AUC == max(AUC)) # %>% filter(occs.n < 800)
+
+# tbl.all.official <- tbl.all  %>%   group_by(species, version) %>% #filter(auc.val.avg >= 0.70) %>%
+#   filter(auc.val.avg == max(auc.val.avg)) # %>% filter(occs.n < 800)
+
+tbl.all.official <- tbl %>%
+  filter(id %notin% tbl.null.ids$id) %>%
+  group_by(species, version) %>% # filter(cbi.val.sd <= 0.10) %>%
+  filter(auc.val.avg == max(auc.val.avg))
+# filter(cbi.val.avg == max(cbi.val.avg)) # %>% filter(occs.n < 800)
+
+
+
+# tbl.all.official <- tbl.all  %>%   group_by(species, version) %>% filter(cbi.val.avg >= 0.70) %>% filter(cbi.val.avg == max(cbi.val.avg)) # %>% filter(occs.n < 800)
+
+# boxplot(tbl.all.official$cbi.val.sd)
+
+# korelovanost výsledků auc AUC v rámci metod
+# zjhistit jakou jkorelovsanost vzkazuje výsledné spojení všech verzí!!!!!!!!!!!!!!!!!!!!!!
+
+zasobnik <- list()
+for (ver in unique(tbl.all.official$version)) {
+  tmp <- tbl.all.official %>% filter(version == ver)
+  print(ver)
+  ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
+  zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
+  zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
+  zasobnik[[ver]][["ci.min"]] <- ct[["conf.int"]][1]
+  zasobnik[[ver]][["ci.max"]] <- ct[["conf.int"]][2]
+}
+zasobnik.t <- t(as_tibble(zasobnik))
+rn <- row.names(zasobnik.t)
+cn <- names(zasobnik[[1]])
+
+zasobnik.t <- as.data.frame(zasobnik.t)
+zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
+
+names(zasobnik.t) <- cn
+zasobnik.t$version <- rn
+
+
+summary_zasobnik <- list()
+tbl.nn <- tbl %>% filter(id %notin% tbl.null.ids$id)
+for (at in auc.tr) {
+  print(at)
+  # null naive
+  summary_zasobnik[[as.character(at)]][["null.val"]] <- nrow(tbl.null.val %>% group_by(species) %>% filter(auc.val_null >= at))
+  # null naive true
+  summary_zasobnik[[as.character(at)]][["null.val.test"]] <- nrow(tbl.nn %>% ungroup() %>% group_by(species) %>% filter(auc.val_null >= at) %>% filter(AUC_null >= at) %>% slice_head(n = 1))
+  # null true
+  summary_zasobnik[[as.character(at)]][["null.test"]] <- nrow(tbl.null.test %>% group_by(species) %>% filter(AUC_null >= at))
+
+
+  # val
+  summary_zasobnik[[as.character(at)]][["kss.val"]] <- nrow(tbl.nn %>% ungroup() %>% group_by(species) %>% slice_max(auc.valdiff, with_ties = FALSE) %>% filter(auc.val.avg >= at))
+
+  # val.test
+  summary_zasobnik[[as.character(at)]][["kss.val.test"]] <- nrow(tbl.nn %>% ungroup() %>% group_by(species) %>% slice_max(auc.valdiff, with_ties = FALSE) %>% filter(auc.val.avg >= at) %>% filter(AUC >= at))
+
+  # true
+  summary_zasobnik[[as.character(at)]][["kss.test"]] <- nrow(tbl.nn %>% ungroup() %>% group_by(species) %>% slice_max(AUCdiff, with_ties = FALSE) %>% filter(AUC >= at))
+
+
+  # true - nejlepší dosažitelné a ověřené - korekce nebo null
+  summary_zasobnik[[as.character(at)]][["all.test"]] <- nrow(tbl %>% ungroup() %>% group_by(species) %>% slice_max(AUC, with_ties = FALSE) %>% filter(AUC >= at))
+}
+
+summary_zasobnik.t <- t(as_tibble(summary_zasobnik))
+rn <- row.names(summary_zasobnik.t)
+cn <- names(summary_zasobnik[[1]])
+
+summary_zasobnik.t <- as.data.frame(summary_zasobnik.t)
+summary_zasobnik.t <- as_tibble(sapply(summary_zasobnik.t, as.numeric))
+
+names(summary_zasobnik.t) <- cn
+summary_zasobnik.t$treshold <- rn
+summary_zasobnik.t$total <- 110
+summary_zasobnik.t %<>% relocate(treshold) %>% relocate(total)
+
+
+stop()
+# #
+# # rozdíl tresholdu podle AUC/auc.val.avg
+# #
+# tbl.all3 <- tbl.all
+# tbl.all3 %<>% ungroup() %>%  group_by(species) %>%
+#   slice_max(AUCdiff, with_ties = FALSE) %>%  filter(AUC >= 0.75)
+# species.AUC <- tbl.all3$species
+#
+
+
+
+
+
+tbl.all3 <- tbl.all
+tbl.all3 %<>% ungroup() %>%
+  group_by(species) %>% # filter(cbi.val.sd <= 0.10) %>%
+  # filter(cbi.val.avg >= 0.80) %>% # & cbi.val.sd <= 0.10
+  # filter(auc.val.avg >= (max(auc.val.avg)  - 0.05))  %>%
+  # filter(delta.AICc <= 2) %>%
+  # filter(cbi.val.avg >= (max(cbi.val.avg)  - 0.05))  %>%
+  # filter(auc.val.avg >= 0.60)  %>%
+  # filter(delta.AICc <= 2) %>%
+  # filter(or.10p.avg == min(or.10p.avg))  %>%
+  # filter(delta.AICc <= 0.1) %>%
+  # filter(delta.AICc == min(delta.AICc) ) %>%
+  # filter(cbi.val.avg >= 0.75)
+  # filter(cbi.val.avg >= max(cbi.val.avg))  %>%
+  # filter(auc.val.avg >= 0.65)
+  # filter(auc.val.avg >= max(auc.val.avg))
+  #  filter(auc.val.avg >= 0.65 ) %>%
+  # filter(cbi.val.avg == max(cbi.val.avg))   %>%
+  # slice_max(cbi.val.avg, with_ties = FALSE) %>% filter(cbi.val.avg >= 0.70)
+  slice_max(auc.val.avg, with_ties = FALSE) %>%
+  filter(auc.val.avg >= 0.75)
+# filter(auc.val.avg == max(auc.val.avg ) )  %>%
+# filter(cbi.val.avg >= (max(cbi.val.avg)  - 0.10))  %>%
+# filter(auc.val.avg  == max(auc.val.avg)) %>% filter(auc.val.avg  >= 0.65)
+species.aucVal <- unique(tbl.all3$species)
+naive.sp <- length(species.aucVal)
+real.sp <- nrow(tbl.all3 %>% filter(AUC >= 0.75))
+real2.sp <- nrow(tbl.all3 %>% filter(AUC >= 0.70))
+print(naive.sp)
+print(real.sp)
+print(real2.sp)
+
+
+
+
+
+
+# setdiff(species.AUC, species.aucVal)
+# setdiff(species.aucVal,  species.AUC)
+
+
+
+
+# přispění kombinací
+tbl.all5 <- tbl.all.official
+tbl.all5 %<>% ungroup()
+# %>% filter(occs.n < 800)
+selection <- selection[selection != "cz_un"] # bez
+k6 <- comb_all(selection, 6)
+# k6 <- comb_k(selection, 6)
+counter <- 0
+first <- TRUE
+for (k in k6) {
+  counter <- counter + 1
+  print(counter)
+  print(paste(k, collapse = "|"))
+  temp <- tbl.all5 %>%
+    filter(version %in% k) %>%
+    group_by(species) %>%
+    slice_max(AUCdiff, with_ties = FALSE) %>%
+    ungroup() %>%
+    summarise(n = length(species), AUCdiffSum = sum(AUCdiff), mean = mean(AUCdiff), AUCdiffMedian = median(AUCdiff), AUCdiffQ_025 = quantile(AUCdiff, 0.25), AUCdiffQ_020 = quantile(AUCdiff, 0.20), AUCdiffQ_010 = quantile(AUCdiff, 0.10), AUCdiffQ_005 = quantile(AUCdiff, 0.05))
+  temp$versionComb <- paste(k, collapse = "|")
+  temp$versionCount <- length(k)
+  if (first) {
+    first <- FALSE
+    res <- temp
+  } else {
+    res %<>% add_row(temp)
+  }
+}
+saveRDS(res, paste0(path.eval, "res.rds"))
 
 #
 ##### # jen druhy co mají smysl... + bych měl možná i dofiltrovat null nad 50%?
@@ -201,7 +400,7 @@ tbl.all %<>% left_join(tbl.null, by = c("species")) %>%
 # jen druhy do 800 occs
 #  tbl.all %<>% filter(occs.n < 800)
 
-
+tbl.all <- tbl.all.official
 tbl.all.median <- tbl.all %>%
   ungroup() %>%
   group_by(version) %>%
@@ -249,65 +448,6 @@ ggplot(tbl.all %>% ungroup(), aes(x = version, y = AUCdiff)) +
 ggsave(paste0(path.img, "tbl.simple", ss, ".png"), width = 1500, height = 1000, units = "px")
 
 
-# b)
-ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_025 >= 0.0), aes(x = version, y = AUCdiff)) +
-  # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
-  geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-  geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
-  geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
-  theme_light() +
-  theme(
-    legend.position = "none", text = element_text(size = 4),
-    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
-  )
-ggsave(paste0(path.img, "tbl.simple.Q025", ss, ".png"), width = 1500, height = 1000, units = "px")
-
-
-# c)
-ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_020 >= 0.0), aes(x = version, y = AUCdiff)) +
-  # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
-  geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-  geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
-  geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
-  theme_light() +
-  theme(
-    legend.position = "none", text = element_text(size = 4),
-    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
-  )
-ggsave(paste0(path.img, "tbl.simple.Q020", ss, ".png"), width = 1500, height = 1000, units = "px")
-
-
-# d)
-ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_010 >= 0.0), aes(x = version, y = AUCdiff)) +
-  # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
-  geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-  geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
-  geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
-  theme_light() +
-  theme(
-    legend.position = "none", text = element_text(size = 4),
-    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
-  )
-ggsave(paste0(path.img, "tbl.simple.Q010", ss, ".png"), width = 1500, height = 1000, units = "px")
-
-# e)
-ggplot(tbl.all %>% ungroup() %>% filter(version %in% selection), aes(x = version, y = AUCdiff)) +
-  # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
-  geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-  geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
-  geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
-  theme_light() +
-  theme(
-    legend.position = "none", text = element_text(size = 4),
-    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
-  )
-ggsave(paste0(path.img, "tbl.simple.selection", ss, ".png"), width = 1500, height = 1000, units = "px")
-
-
 
 #####
 ##### pozor, záleží i na tom, jestli je zhoršení z 90 na 80 nebo z 60 na 50!! Nebo zlepšení z 50 na 60 mě taky nemusí zajímat, a z 80 na 90 také ne...
@@ -342,60 +482,6 @@ ggplot(tbl.all %>% ungroup(), aes(occs.n, AUCdiff)) +
   ) +
   facet_wrap(~version)
 ggsave(paste0(path.img, "tbl.trend-prevalence", ss, ".png"), width = 2000, height = 1500, units = "px")
-
-
-# b) 0.25
-ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_025 >= 0.0), aes(occs.n, AUCdiff)) +
-  geom_point(aes(colour = factor(version)), size = 0.05) +
-  geom_smooth(method = loess, size = 0.2) +
-  theme_light() +
-  theme(
-    legend.position = "none", text = element_text(size = 6),
-    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
-  ) +
-  facet_wrap(~version)
-ggsave(paste0(path.img, "tbl.trend-prevalence.Q025", ss, ".png"), width = 2000, height = 1500, units = "px")
-
-# c) 0.20
-ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_020 >= 0.0), aes(occs.n, AUCdiff)) +
-  geom_point(aes(colour = factor(version)), size = 0.05) +
-  geom_smooth(method = loess, size = 0.2) +
-  theme_light() +
-  theme(
-    legend.position = "none", text = element_text(size = 6),
-    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
-  ) +
-  facet_wrap(~version)
-ggsave(paste0(path.img, "tbl.trend-prevalence.Q020", ss, ".png"), width = 2000, height = 1500, units = "px")
-
-
-# d) 0.10
-
-ggplot(tbl.all %>% ungroup() %>% filter(AUCdiffQ_010 >= 0.0), aes(occs.n, AUCdiff)) +
-  geom_point(aes(colour = factor(version)), size = 0.05) +
-  geom_smooth(method = loess, size = 0.2) +
-  theme_light() +
-  theme(
-    legend.position = "none", text = element_text(size = 6),
-    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
-  ) +
-  facet_wrap(~version)
-ggsave(paste0(path.img, "tbl.trend-prevalence.Q010", ss, ".png"), width = 2000, height = 1500, units = "px")
-
-
-# e) výběr
-ggplot(tbl.all %>% ungroup() %>% filter(version %in% selection), aes(occs.n, AUCdiff)) +
-  geom_point(aes(colour = factor(version)), size = 0.05) +
-  geom_smooth(method = loess, size = 0.2) +
-  theme_light() +
-  theme(
-    legend.position = "none", text = element_text(size = 6),
-    panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
-  ) +
-  facet_wrap(~version)
-ggsave(paste0(path.img, "tbl.trend-prevalence.selection", ss, ".png"), width = 3000, height = 1500, units = "px")
-
-
 
 
 
