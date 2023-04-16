@@ -351,9 +351,9 @@ for (rep in 1:ndop.fs$replicates) {
 
         # SSOS - nad top50 druhy
 
-        tgob.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
-        tgob.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
-        tgob.top100 <- bgSources$topA.100 %>% filter(AUTOR %in% pres.au)
+        # tgob.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        tgob.top10 <- bgSources$topS10 %>% filter(AUTOR %in% pres.au)
+        tgob.top100 <- bgSources$topA100 %>% filter(AUTOR %in% pres.au)
 
 
         pres.unique <- ndopP.POLE %>%
@@ -421,16 +421,16 @@ for (rep in 1:ndop.fs$replicates) {
         ssos2_001 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[1])
         pres.au <- unique(ssos2_001$AUTOR)
         ssos2_001.P <- ndopP %>% filter(AUTOR %in% pres.au)
-        ssos2_001.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
-        ssos2_001.P.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
-        ssos2_001.P.top100 <- bgSources$topA.100 %>% filter(AUTOR %in% pres.au)
+        # ssos2_001.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        ssos2_001.P.top10 <- bgSources$topS10 %>% filter(AUTOR %in% pres.au)
+        ssos2_001.P.top100 <- bgSources$topA100 %>% filter(AUTOR %in% pres.au)
 
         ssos2_010 <- ssos.DRUH.AUTOR.ratio %>% filter(ratio > ssos.DRUH.ratio.quantile[2])
         pres.au <- unique(ssos2_010$AUTOR)
         ssos2_010.P <- ndopP %>% filter(AUTOR %in% pres.au)
-        ssos2_010.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
-        ssos2_010.P.top10 <- bgSources$topS.10 %>% filter(AUTOR %in% pres.au)
-        ssos2_010.P.top100 <- bgSources$topA.100 %>% filter(AUTOR %in% pres.au)
+        # ssos2_010.P.top50 <- bgSources$topS.50 %>% filter(AUTOR %in% pres.au)
+        ssos2_010.P.top10 <- bgSources$topS10 %>% filter(AUTOR %in% pres.au)
+        ssos2_010.P.top100 <- bgSources$topA100 %>% filter(AUTOR %in% pres.au)
 
         ssos.DRUH.AUTOR.ratio.puv <- ssos.DRUH.AUTOR.ratio
 
