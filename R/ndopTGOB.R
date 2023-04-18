@@ -104,7 +104,7 @@ vf <- list("1" = 1:8, "0" = 9)
 
 ndop.fs <- list(
     "adjusts" = c(0.1, 0.5, 1, 2, 3, 4),
-    "tuneArgs" = list(fc = c("L", "LQ", "H", "LQH", "LQHP"), rm = c(0.5, 1, 2, 3, 4)),
+    "tuneArgs" = list(fc = c("L", "LQ", "LQH"), rm = c(0.5, 1, 2, 3, 4)), # , "H", "LQH", "LQHP"
     "bgRatio" = 1 / 10,
     "speciesPerGroup" = 2, "speciesOccMin" = 30,
     "sq2rad" = c((1 / 6) / 4, 0.1 / 4), # kvadráty KFME 2rad, xy velikost ve stupních
@@ -671,45 +671,53 @@ for (rep in 1:ndop.fs$replicates) {
 
                 print("základní:")
 
-                if (inherits(try({
-                    e.mx.all[[druh]][[id]][[adjust]] <- ENMevaluate(
-                        user.grp = list("occs.grp" = block.p$fold, "bg.grp" = block.bg$fold),
-                        occs = df.temp,
-                        envs = predictors,
-                        bg = bg.temp,
-                        algorithm = "maxnet", partitions = "user",
-                        # partition.settings = list("kfolds" = 3),
-                        tune.args = tune.args,
-                        other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
-                    )
-                }), "try-error")) {
-                    e.mx.all[[druh]][[id]][[adjust]] <- NA
-                }
-
-                # varianta s thinningem presencí přidaných do UN
-                if ("un" == id) {
-                    print("thin:")
-                    for (thinDist in names(collector.thin[[id]])) {
-                        df.temp.thin <- as.data.frame(st_coordinates(collector.thin[[id]][[thinDist]]))
-                        names(df.temp.thin) <- ll
-                        # podstrčit thinning presence místo původních
-                        print("měním presenční dataset pro thinnovací verze")
-
-                        block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
+                # FC
+                for (FC in tune.args$fc) {
+                    # RM
+                    for (RM in tune.args$rm) {
+                        tune.args.ind <- list("fc" = FC, "rm" = RM)
 
                         if (inherits(try({
-                            e.mx.all[[druh]][[id]][[thinDist]] <- ENMevaluate(
-                                user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
-                                occs = df.temp.thin,
+                            e.mx.all[[druh]][[id]][[adjust]][[FC]][[as.character(RM)]] <- ENMevaluate(
+                                user.grp = list("occs.grp" = block.p$fold, "bg.grp" = block.bg$fold),
+                                occs = df.temp,
                                 envs = predictors,
                                 bg = bg.temp,
                                 algorithm = "maxnet", partitions = "user",
                                 # partition.settings = list("kfolds" = 3),
-                                tune.args = tune.args,
+                                tune.args = tune.args.ind,
                                 other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
                             )
                         }), "try-error")) {
-                            e.mx.all[[druh]][[id]][[thinDist]] <- NA
+                            e.mx.all[[druh]][[id]][[adjust]][[FC]][[as.character(RM)]] <- NA
+                        }
+
+                        # varianta s thinningem presencí přidaných do UN
+                        if ("un" == id) {
+                            print("thin:")
+                            for (thinDist in names(collector.thin[[id]])) {
+                                df.temp.thin <- as.data.frame(st_coordinates(collector.thin[[id]][[thinDist]]))
+                                names(df.temp.thin) <- ll
+                                # podstrčit thinning presence místo původních
+                                print("měním presenční dataset pro thinnovací verze")
+
+                                block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
+
+                                if (inherits(try({
+                                    e.mx.all[[druh]][[id]][[thinDist]][[FC]][[as.character(RM)]] <- ENMevaluate(
+                                        user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
+                                        occs = df.temp.thin,
+                                        envs = predictors,
+                                        bg = bg.temp,
+                                        algorithm = "maxnet", partitions = "user",
+                                        # partition.settings = list("kfolds" = 3),
+                                        tune.args = tune.args.ind,
+                                        other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
+                                    )
+                                }), "try-error")) {
+                                    e.mx.all[[druh]][[id]][[thinDist]][[FC]][[as.character(RM)]] <- NA
+                                }
+                            }
                         }
                     }
                 }

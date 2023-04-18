@@ -132,9 +132,9 @@ if (file.exists(modelsResults.avg)) {
 
 
   # rozparsování verzí do samostatných částí
-  tbl %<>%
-    ungroup() %>%
-    separate_wider_delim(version, "_", names = c("method", "bgSource"), too_few = "align_start", cols_remove = FALSE)
+  # tbl %<>%
+  #   ungroup() %>%
+  #  separate_wider_delim(version, "_", names = c("method", "bgSource"), too_few = "align_start", cols_remove = FALSE)
 
   # tbl.orig  <- tbl
 
@@ -160,14 +160,10 @@ auc.tr <- c(0.70, 0.75)
 
 
 ss <- "-all"
-# selection <- c("cz_tgob", "cz_topS.50", "cz_topS.10", "cz_ssos.0", "ssos.0_ssos.0", "cz_ssos.1.001", "ssos.1.001_ssos.1.001", "cz_ssos.0.topS50", "cz_ssos.0.topS10", "cz_ssos.1.001.topS10", "cz_ssos.2.001.topS10") #
-# selection <- c("cz_tgob", "cz_topS.50", "cz_topS.10", "cz_ssos.0", "cz_ssos.1.001", "cz_ssos.1.001.topS10") #
-# selection <- unique(tbl.all$version)
-
-# selection <- c("cz_tgob", "cz_topS.10", "ssos.0_ssos.0",  "cz_topA.100",  "ssos.0_ssos.0.topS10", "ssos.0_ssos.0.topA100", "cz_un")
-selection <- c("cz_tgob", "cz_topS.10", "cz_ssos.0", "cz_topA.100", "cz_ssos.0.topS10", "cz_ssos.0.topA100", "cz_un")
-# selection <- c("cz_tgob", "cz_topS.10", "cz_ssos.1.001",  "cz_topA.100",  "cz_ssos.1.001.topS10", "cz_ssos.1.001.topA100", "cz_un")
-# selection <- c("cz_tgob", "cz_topS.10", "cz_ssos.0",  "cz_topA.100", "cz_un")
+selection <- c("ssos", "ssos.topA100", "ssos.topS10", "ssos2", "ssos2.topA100", "ssos2.topS10", "tgob", "topA100", "topS10", "un")
+selection.f <- c("ssos2", "ssos2.topA100", "ssos2.topS10", "tgob", "topA100", "topS10", "un")
+####
+# selection <- c("ssos", "ssos.topA100","ssos.topS10" , "tgob", "topA100", "topS10", "un" )
 tbl %<>% filter(version %in% selection)
 
 
@@ -175,7 +171,7 @@ tbl %<>% filter(version %in% selection)
 # tbl %<>% filter(species %in% unique(sp30$TaxonNameLAT))
 
 # random (null) verze k porovnání
-tbl.null.ids <- tbl %>% filter(bgSource == "un" & adjust == "0")
+tbl.null.ids <- tbl %>% filter(version == "un" & adjust == "0")
 
 tbl.null.test <- tbl.null.ids %>%
   group_by(species) %>%
@@ -192,7 +188,12 @@ tbl.null.val <- tbl.null.ids %>%
   rename(auc.val_null = auc.val.avg) %>%
   ungroup()
 
-
+##########################
+#
+# musím odlišit/vyčlenit thinningy (zbývající UN)´- ze summary_zasobnik
+# kde vyfiltrovat 0.70 AUC? nebo auc.val.avg?
+#
+#######################
 
 
 

@@ -69,7 +69,7 @@ lsd.pa.centroids <- readRDS(paste0(path.lsd, "lsd.pa.centroids.rds")) %>% filter
 # settings
 ############
 
-ndop.fs <- list("groups" = 5, "version" = "v1")
+ndop.fs <- list("groups" = 55, "version" = "v1")
 
 ############
 # execution
@@ -82,7 +82,7 @@ lsd.pa.centroids.species <- unlist(unique(lsd.pa.centroids$TaxonNameLAT))
 rds_list <-
     list.files(
         path.models,
-        pattern = paste0("^2ssos_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
+        pattern = paste0("^3ssos_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
         ignore.case = TRUE,
         full.names = TRUE
     )
@@ -133,72 +133,80 @@ for (fpath in rds_list) {
             print(adjust)
             second <- TRUE
 
-            if (is.logical(rds.l[[sp]][[version]][[adjust]])) {
-                # nékdy daný adjust nebyl upočitatelný a nic tam není...
-                next
-            }
 
-            for (layer in names(rds.l[[sp]][[version]][[adjust]]@predictions)) {
-                ev <- NA
 
-                print(layer)
-                r.temp <- rds.l[[sp]][[version]][[adjust]]@predictions[[layer]]
-                # rds.r[[sp]][[version]][[adjust]][[layer]] <- r.temp
-                ex.predicted <- extract(r.temp, st_coordinates(lsd.temp))
+            # FC
+            for (FC in names(rds.l[[sp]][[version]][[adjust]])) {
+                # RM
+                for (RM in names(rds.l[[sp]][[version]][[adjust]][[FC]])) {
+                    if (is.logical(rds.l[[sp]][[version]][[adjust]][[FC]][[RM]])) {
+                        # nékdy daný adjust nebyl upočitatelný a nic tam není...
+                        next
+                    }
 
-                #
-                # dopočíst a přidat další metriky z performance() (rgee)!!!
-                # tam ale není nic co zohledňuje tn tp (bez poměru k fp)
-                #
+                    for (layer in names(rds.l[[sp]][[version]][[adjust]][[FC]][[RM]]@predictions)) {
+                        ev <- NA
 
-                # _přidat_ partial pROC verzi!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                if (inherits(try({
-                    ev <- sdm::evaluates(lsd.temp$presence, ex.predicted)
-                }), "try-error")) {
-                    ev <- NA
+                        print(layer)
+                        r.temp <- rds.l[[sp]][[version]][[adjust]][[FC]][[RM]]@predictions[[layer]]
+                        # rds.r[[sp]][[version]][[adjust]][[layer]] <- r.temp
+                        ex.predicted <- extract(r.temp, st_coordinates(lsd.temp))
+
+                        #
+                        # dopočíst a přidat další metriky z performance() (rgee)!!!
+                        # tam ale není nic co zohledňuje tn tp (bez poměru k fp)
+                        #
+
+                        # _přidat_ partial pROC verzi!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        if (inherits(try({
+                            ev <- sdm::evaluates(lsd.temp$presence, ex.predicted)
+                        }), "try-error")) {
+                            ev <- NA
+                        }
+                        if (is.na(ev)) {
+                            next
+                        }
+                        ev.temp <- as.data.frame(ev@statistics[-3])
+                        ev.temp <- merge(ev.temp, t(as.data.frame(ev@statistics$COR)))
+                        ev.temp <- merge(ev.temp, ev@threshold_based[2, ]) # max(se+sp)
+                        ev.temp <- as.data.frame(ev@statistics[-3])
+                        ev.temp <- merge(ev.temp, t(as.data.frame(ev@statistics$COR)))
+                        # max(se+sp)
+                        ev.temp <- merge(ev.temp, ev@threshold_based[2, ])
+                        ev.temp[["tune.args"]] <- layer
+                        if (second) {
+                            second <- FALSE
+                            out.t.second <- ev.temp
+                        } else {
+                            out.t.second %<>% add_row(ev.temp)
+                        }
+                    }
+                    rds.l[[sp]][[version]][[adjust]][[FC]][[RM]]@results[["species"]] <- sp
+                    rds.l[[sp]][[version]][[adjust]][[FC]][[RM]]@results[["version"]] <- version
+                    rds.l[[sp]][[version]][[adjust]][[FC]][[RM]]@results[["adjust"]] <- adjust
+
+                    temp.t <- rds.l[[sp]][[version]][[adjust]][[FC]][[RM]]@results %>% left_join(out.t.second, by = "tune.args")
+
+                    occs <- rds.l[[sp]][[version]][[adjust]][[FC]][[RM]]@occs
+                    temp.t$occs.n <- nrow(occs)
+
+                    temp.t$bg.n <- nrow(rds.l[[sp]][[version]][[adjust]][[FC]][[RM]]@bg)
+                    # LSD
+                    temp.t$p.n <- nrow(lsd.temp %>% filter(presence == 1))
+                    temp.t$a.n <- nrow(lsd.temp %>% filter(presence == 0))
+                    # temp.t$p.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 1)))
+                    # temp.t$a.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 0)))
+                    # temp.t$occs.wkt <- st_as_text(st_combine(occs %>% st_as_sf(coords = c("longitude", "latitude"), crs = 4326)))
+
+                    if (first) {
+                        first <- FALSE
+                        out.t <- temp.t
+                    } else {
+                        out.t %<>% add_row(temp.t)
+                    }
+                    gc()
                 }
-                if (is.na(ev)) {
-                    next
-                }
-                ev.temp <- as.data.frame(ev@statistics[-3])
-                ev.temp <- merge(ev.temp, t(as.data.frame(ev@statistics$COR)))
-                ev.temp <- merge(ev.temp, ev@threshold_based[2, ]) # max(se+sp)
-                ev.temp <- as.data.frame(ev@statistics[-3])
-                ev.temp <- merge(ev.temp, t(as.data.frame(ev@statistics$COR)))
-                # max(se+sp)
-                ev.temp <- merge(ev.temp, ev@threshold_based[2, ])
-                ev.temp[["tune.args"]] <- layer
-                if (second) {
-                    second <- FALSE
-                    out.t.second <- ev.temp
-                } else {
-                    out.t.second %<>% add_row(ev.temp)
-                }
             }
-            rds.l[[sp]][[version]][[adjust]]@results[["species"]] <- sp
-            rds.l[[sp]][[version]][[adjust]]@results[["version"]] <- version
-            rds.l[[sp]][[version]][[adjust]]@results[["adjust"]] <- adjust
-
-            temp.t <- rds.l[[sp]][[version]][[adjust]]@results %>% left_join(out.t.second, by = "tune.args")
-
-            occs <- rds.l[[sp]][[version]][[adjust]]@occs
-            temp.t$occs.n <- nrow(occs)
-
-            temp.t$bg.n <- nrow(rds.l[[sp]][[version]][[adjust]]@bg)
-            # LSD
-            temp.t$p.n <- nrow(lsd.temp %>% filter(presence == 1))
-            temp.t$a.n <- nrow(lsd.temp %>% filter(presence == 0))
-            # temp.t$p.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 1)))
-            # temp.t$a.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 0)))
-            # temp.t$occs.wkt <- st_as_text(st_combine(occs %>% st_as_sf(coords = c("longitude", "latitude"), crs = 4326)))
-
-            if (first) {
-                first <- FALSE
-                out.t <- temp.t
-            } else {
-                out.t %<>% add_row(temp.t)
-            }
-            gc()
         }
     }
     # ukládat per species - nutno - jinak je výsledné rds s rastery predikcí extrémně velké a nenačitatelné/neuložitelné
