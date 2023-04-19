@@ -271,7 +271,10 @@ for (at in ndop.fs$aucTresholds) {
 
   zasobnik <- list()
   for (ver in unique(tbl.nn$version)) {
-    tmp <- tbl.nn %>% filter(auc.val.avg >= at) %>% filter(version == ver)
+    tmp <- tbl.nn %>%
+      ungroup() %>%
+      filter(auc.val.avg >= at) %>%
+      filter(version == ver)
     ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
     zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
     zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
@@ -285,8 +288,34 @@ for (at in ndop.fs$aucTresholds) {
   zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
   names(zasobnik.t) <- cn
   zasobnik.t$version <- rn
-  zasobnik0[[as.character(at)]] <- zasobnik.t %<>% arrange(desc(cor))
+  zasobnik0[[as.character(at)]][["all"]] <- zasobnik.t %<>% arrange(desc(cor))
   write.csv(zasobnik.t, paste0(path.PP, "korelace-", as.character(at), ".csv"), row.names = FALSE)
+
+  # max verze
+  zasobnik <- list()
+  for (ver in unique(tbl.nn$version)) {
+    tmp <- tbl.nn %>%
+      ungroup() %>%
+      group_by(species, version) %>%
+      slice_max(auc.val.avg, with_ties = FALSE) %>%
+      filter(auc.val.avg >= at) %>%
+      filter(version == ver)
+    ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
+    zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
+    zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
+    zasobnik[[ver]][["ci.min"]] <- ct[["conf.int"]][1]
+    zasobnik[[ver]][["ci.max"]] <- ct[["conf.int"]][2]
+  }
+  zasobnik.t <- t(as_tibble(zasobnik))
+  rn <- row.names(zasobnik.t)
+  cn <- names(zasobnik[[1]])
+  zasobnik.t <- as.data.frame(zasobnik.t)
+  zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
+  names(zasobnik.t) <- cn
+  zasobnik.t$version <- rn
+  zasobnik0[[as.character(at)]][["max"]] <- zasobnik.t %<>% arrange(desc(cor))
+  write.csv(zasobnik.t, paste0(path.PP, "korelace-max-", as.character(at), ".csv"), row.names = FALSE)
+
 
 
   ##########################################################################################################################################################################
@@ -367,31 +396,31 @@ for (at in ndop.fs$aucTresholds) {
     facet_wrap(~species)
   ggsave(paste0(path.PP, "version-species.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
-# přispění kombinací
-temp.g %<>% ungroup()
+  # přispění kombinací
+  temp.g %<>% ungroup()
 
-counter <- 0
-first <- TRUE
-for (k in k6) {
-  counter <- counter + 1
-  print(counter)
-  print(paste(k, collapse = "|"))
-  temp <- temp.g %>%
-    filter(version %in% k) %>%
-    group_by(species) %>%
-    slice_max(auc.valdiff, with_ties = FALSE) %>%
-    ungroup() %>%
-    summarise(n = length(species), AUCdiffSum = sum(auc.valdiff), mean = mean(auc.valdiff), AUCdiffMedian = median(auc.valdiff), AUCdiffQ_025 = quantile(auc.valdiff, 0.25), AUCdiffQ_020 = quantile(auc.valdiff, 0.20), AUCdiffQ_010 = quantile(auc.valdiff, 0.10), AUCdiffQ_005 = quantile(auc.valdiff, 0.05))
-  temp$versionComb <- paste(k, collapse = "|")
-  temp$versionCount <- length(k)
-  if (first) {
-    first <- FALSE
-    res <- temp
-  } else {
-    res %<>% add_row(temp)
+  counter <- 0
+  first <- TRUE
+  for (k in k6) {
+    counter <- counter + 1
+    print(counter)
+    print(paste(k, collapse = "|"))
+    temp <- temp.g %>%
+      filter(version %in% k) %>%
+      group_by(species) %>%
+      slice_max(auc.valdiff, with_ties = FALSE) %>%
+      ungroup() %>%
+      summarise(n = length(species), AUCdiffSum = sum(auc.valdiff), mean = mean(auc.valdiff), AUCdiffMedian = median(auc.valdiff), AUCdiffQ_025 = quantile(auc.valdiff, 0.25), AUCdiffQ_020 = quantile(auc.valdiff, 0.20), AUCdiffQ_010 = quantile(auc.valdiff, 0.10), AUCdiffQ_005 = quantile(auc.valdiff, 0.05))
+    temp$versionComb <- paste(k, collapse = "|")
+    temp$versionCount <- length(k)
+    if (first) {
+      first <- FALSE
+      res <- temp
+    } else {
+      res %<>% add_row(temp)
+    }
   }
-}
-combs[[as.character(at)]][["val"]]  <- res %<>% arrange(desc(AUCdiffSum))
+  combs[[as.character(at)]][["val"]] <- res %<>% arrange(desc(AUCdiffSum))
   write.csv(res, paste0(path.PP, "combs-val-", as.character(at), ".csv"), row.names = FALSE)
 
 
@@ -465,31 +494,31 @@ combs[[as.character(at)]][["val"]]  <- res %<>% arrange(desc(AUCdiffSum))
     facet_wrap(~species)
   ggsave(paste0(path.PP, "version-species.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
-# přispění kombinací
-temp.g %<>% ungroup()
+  # přispění kombinací
+  temp.g %<>% ungroup()
 
-counter <- 0
-first <- TRUE
-for (k in k6) {
-  counter <- counter + 1
-  print(counter)
-  print(paste(k, collapse = "|"))
-  temp <- temp.g %>%
-    filter(version %in% k) %>%
-    group_by(species) %>%
-    slice_max(auc.valdiff, with_ties = FALSE) %>%
-    ungroup() %>%
-    summarise(n = length(species), AUCdiffSum = sum(auc.valdiff), mean = mean(auc.valdiff), AUCdiffMedian = median(auc.valdiff), AUCdiffQ_025 = quantile(auc.valdiff, 0.25), AUCdiffQ_020 = quantile(auc.valdiff, 0.20), AUCdiffQ_010 = quantile(auc.valdiff, 0.10), AUCdiffQ_005 = quantile(auc.valdiff, 0.05))
-  temp$versionComb <- paste(k, collapse = "|")
-  temp$versionCount <- length(k)
-  if (first) {
-    first <- FALSE
-    res <- temp
-  } else {
-    res %<>% add_row(temp)
+  counter <- 0
+  first <- TRUE
+  for (k in k6) {
+    counter <- counter + 1
+    print(counter)
+    print(paste(k, collapse = "|"))
+    temp <- temp.g %>%
+      filter(version %in% k) %>%
+      group_by(species) %>%
+      slice_max(auc.valdiff, with_ties = FALSE) %>%
+      ungroup() %>%
+      summarise(n = length(species), AUCdiffSum = sum(auc.valdiff), mean = mean(auc.valdiff), AUCdiffMedian = median(auc.valdiff), AUCdiffQ_025 = quantile(auc.valdiff, 0.25), AUCdiffQ_020 = quantile(auc.valdiff, 0.20), AUCdiffQ_010 = quantile(auc.valdiff, 0.10), AUCdiffQ_005 = quantile(auc.valdiff, 0.05))
+    temp$versionComb <- paste(k, collapse = "|")
+    temp$versionCount <- length(k)
+    if (first) {
+      first <- FALSE
+      res <- temp
+    } else {
+      res %<>% add_row(temp)
+    }
   }
-}
-combs[[as.character(at)]][["val.test"]]  <- res %<>% arrange(desc(AUCdiffSum))
+  combs[[as.character(at)]][["val.test"]] <- res %<>% arrange(desc(AUCdiffSum))
   write.csv(res, paste0(path.PP, "combs-val.test-", as.character(at), ".csv"), row.names = FALSE)
 
 
@@ -565,34 +594,32 @@ combs[[as.character(at)]][["val.test"]]  <- res %<>% arrange(desc(AUCdiffSum))
   ggsave(paste0(path.PP, "version-species.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
 
-# přispění kombinací
-temp.g %<>% ungroup()
+  # přispění kombinací
+  temp.g %<>% ungroup()
 
-counter <- 0
-first <- TRUE
-for (k in k6) {
-  counter <- counter + 1
-  print(counter)
-  print(paste(k, collapse = "|"))
-  temp <- temp.g %>%
-    filter(version %in% k) %>%
-    group_by(species) %>%
-    slice_max(AUCdiff, with_ties = FALSE) %>%
-    ungroup() %>%
-    summarise(n = length(species), AUCdiffSum = sum(AUCdiff), mean = mean(AUCdiff), AUCdiffMedian = median(AUCdiff), AUCdiffQ_025 = quantile(AUCdiff, 0.25), AUCdiffQ_020 = quantile(AUCdiff, 0.20), AUCdiffQ_010 = quantile(AUCdiff, 0.10), AUCdiffQ_005 = quantile(AUCdiff, 0.05))
-  temp$versionComb <- paste(k, collapse = "|")
-  temp$versionCount <- length(k)
-  if (first) {
-    first <- FALSE
-    res <- temp
-  } else {
-    res %<>% add_row(temp)
+  counter <- 0
+  first <- TRUE
+  for (k in k6) {
+    counter <- counter + 1
+    print(counter)
+    print(paste(k, collapse = "|"))
+    temp <- temp.g %>%
+      filter(version %in% k) %>%
+      group_by(species) %>%
+      slice_max(AUCdiff, with_ties = FALSE) %>%
+      ungroup() %>%
+      summarise(n = length(species), AUCdiffSum = sum(AUCdiff), mean = mean(AUCdiff), AUCdiffMedian = median(AUCdiff), AUCdiffQ_025 = quantile(AUCdiff, 0.25), AUCdiffQ_020 = quantile(AUCdiff, 0.20), AUCdiffQ_010 = quantile(AUCdiff, 0.10), AUCdiffQ_005 = quantile(AUCdiff, 0.05))
+    temp$versionComb <- paste(k, collapse = "|")
+    temp$versionCount <- length(k)
+    if (first) {
+      first <- FALSE
+      res <- temp
+    } else {
+      res %<>% add_row(temp)
+    }
   }
-}
-combs[[as.character(at)]][["test"]]  <- res %<>% arrange(desc(AUCdiffSum))
+  combs[[as.character(at)]][["test"]] <- res %<>% arrange(desc(AUCdiffSum))
   write.csv(res, paste0(path.PP, "combs-test-", as.character(at), ".csv"), row.names = FALSE)
-
-
 }
 
 saveRDS(combs, paste0(path.PP, "combs.rds"))
