@@ -38,7 +38,7 @@ path.rgee <- paste0(path.wd, "../../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec20
 source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.lsd <- paste0(path.prep, "lsd/")
 path.eval <- paste0(path.prep, "ndopTGOBeval/")
-path.img <- paste0(path.eval, "img/")
+path.PP <- paste0(path.eval, "PP/")
 
 ############
 # inputs
@@ -50,36 +50,18 @@ lsd.pa.centroids <- readRDS(paste0(path.lsd, "lsd.pa.centroids.rds")) %>% filter
 # settings
 ############
 
-ndop.fs <- list("months" = c(4:6), "years" = c(2019:2022), "precision" = 1000, "version" = "v1")
+ndop.fs <- list("aucTresholds" = c(0.00, 0.70, 0.75), "version" = "v1")
 
 ############
 # execution
 ############
-
+dir.create(path.PP, showWarnings = FALSE)
 
 #
 # pokud je nějaká metoda korelovaná s LSD AUC, tak to znamená, že asi opravdu funguje korekce biasu? ne, jen že se lze spolehnout na výsledky auc.var.avg
 #
 # mě zajímá především korelace k nejlepším výsledkům, tyto totiž vybírám - dat do vztahu, jestli jsou vyšší AUC i lépe korelované
 #
-
-# ag <- as_tibble(readRDS("/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/RP/dataPrep/ndopTGOBeval/ssos.t_Accipiter gentilis_1.rds"))
-# # cor(ag$auc.val.avg, ag$AUC)
-
-# ### mělo by stačit to načíst vše a pak zgroupoivat - nepotřebuju cykly
-# cors <- list()
-# for (v in unique(ag$version)) {
-#   print(v)
-#   temp.v <- ag %>% filter(version == v)
-#   cors[[v]] <- cor(temp.v$auc.val.avg, temp.v$AUC)
-# }
-
-# cors.t <- t(as.data.frame(cors))
-# cors.names <- rownames(cors.t)
-# cors.t <- as_tibble(cors.t)
-# cors.t$version <- cors.names
-
-# plot(`ssos.t_Accipiter gentilis_1`$auc.val.avg, `ssos.t_Accipiter gentilis_1`$AUC)
 
 
 "%notin%" <- Negate("%in%")
@@ -130,13 +112,10 @@ if (file.exists(modelsResults.avg)) {
   tbl <- readRDS(modelsResults.avg)
 } else {
 
-
-  # rozparsování verzí do samostatných částí
+  # # rozparsování verzí do samostatných částí
   # tbl %<>%
   #   ungroup() %>%
   #  separate_wider_delim(version, "_", names = c("method", "bgSource"), too_few = "align_start", cols_remove = FALSE)
-
-  # tbl.orig  <- tbl
 
   # průměry z replikací
   tbl.avg <- tbl %>%
@@ -157,19 +136,12 @@ if (file.exists(modelsResults.avg)) {
   saveRDS(tbl, paste0(path.eval, "tbl.rds"))
 }
 
-auc.tr <- c(0.00, 0.70, 0.75)
 
-ss <- "-all"
 selection <- c("ssos", "ssos.topA100", "ssos.topS10", "ssos2", "ssos2.topA100", "ssos2.topS10", "tgob", "topA100", "topS10", "un")
 selection.f <- c("ssos", "ssos.topA100", "ssos.topS10", "tgob", "topA100", "topS10", "un")
 selection.f2 <- c("ssos2", "ssos2.topA100", "ssos2.topS10", "tgob", "topA100", "topS10", "un")
 ####
-# selection <- c("ssos", "ssos.topA100","ssos.topS10" , "tgob", "topA100", "topS10", "un" )
-tbl %<>% filter(version %in% selection)
-
-
-# sp30 <- lsd.pa.centroids %>% group_by(TaxonNameLAT) %>% filter(sum(presence == 1) >= 30 ) %>%  filter(sum(presence == 0) >= 30 )
-# tbl %<>% filter(species %in% unique(sp30$TaxonNameLAT))
+# tbl %<>% filter(version %in% selection)
 
 # random (null) verze k porovnání
 tbl.null.ids <- tbl %>% filter(version == "un" & adjust == "0")
@@ -204,24 +176,7 @@ tbl.null.val <- tbl.null.ids %>%
 ##### Zohlednit! Stejně tak i udělat hranici 0.75 - dofiltrovat, neúspěšné druhy mě také nezajímají!!!
 #####
 
-
-
-
-# ostatní verze k ověření zbavené random null
-# tbl.all <- tbl %>% filter(version != "rss_un" && adjust != 0)  # funguje divně
-# tbl.all <- tbl %>% filter(id %notin% tbl.null.ids$id) # v UN verzi zůstávají thinningy
-
-
-
-# # připojím random a spočtu rozdíl AUC
-# tbl.all %<>% left_join(tbl.null, by = c("species")) %>%
-#   mutate(AUCdiff = AUC - AUC_null) %>%
-#   group_by(species, version) %>%
-#   slice_max(AUCdiff, with_ties = FALSE)
-
-
-
-# oficiál
+# připojím null (val+test) a spočtu diff
 tbl %<>% left_join(tbl.null.test, by = c("species"), suffix = c("", "__AUC")) %>%
   mutate(AUCdiff = AUC - AUC_null) %>%
   group_by(species, version)
@@ -238,18 +193,17 @@ tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg"))
 
 summary_zasobnik <- list()
 zasobnik0 <- list()
+combs <- list()
+k6 <- comb_all(selection.f2, length(selection.f2))
 
 tbl.f <- tbl %>% filter(version %in% selection.f2) # final versions selection
-tbl.nn <- tbl.f %>% filter(id %notin% tbl.null.ids.unique)
-tbl.null <- tbl.f %>% filter(id %in% tbl.null.ids.unique)
+tbl.nn <- tbl.f %>% filter(id %notin% tbl.null.ids.unique) # not null
+tbl.null <- tbl.f %>% filter(id %in% tbl.null.ids.unique) # null
 
-for (at in auc.tr) {
+for (at in ndop.fs$aucTresholds) {
   print(at)
 
-
-
   ##########################################################################################################################################################################
-
 
   #
   # null
@@ -313,7 +267,7 @@ for (at in auc.tr) {
   # měl bych ale spočíst i omision rate nad LSD - tam by měl být smysluplný?
 
   # korelovanost výsledků auc AUC v rámci metod
-  # zjhistit jakou jkorelovsanost vzkazuje výsledné spojení všech verzí!!!!!!!!!!!!!!!!!!!!!!
+  # zjistit jakou korelovsanost vykazuje výsledné spojení všech verzí!!!!!!!!!!!!!!!!!!!!!!
 
   zasobnik <- list()
   for (ver in unique(tbl.nn$version)) {
@@ -331,8 +285,8 @@ for (at in auc.tr) {
   zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
   names(zasobnik.t) <- cn
   zasobnik.t$version <- rn
-  zasobnik0[[as.character(at)]] <- zasobnik.t
-
+  zasobnik0[[as.character(at)]] <- zasobnik.t %<>% arrange(desc(cor))
+  write.csv(zasobnik.t, paste0(path.PP, "korelace-", as.character(at), ".csv"), row.names = FALSE)
 
 
   ##########################################################################################################################################################################
@@ -383,7 +337,7 @@ for (at in auc.tr) {
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
-  ggsave(paste0(path.img, "boxplot.val.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
+  ggsave(paste0(path.PP, "boxplot.val.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
 
 
   # a) vše
@@ -397,7 +351,7 @@ for (at in auc.tr) {
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~version)
-  ggsave(paste0(path.img, "trend.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP, "trend.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
 
   # porovnání přispění verzí per species
@@ -411,8 +365,34 @@ for (at in auc.tr) {
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~species)
-  ggsave(paste0(path.img, "version-species.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP, "version-species.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
+# přispění kombinací
+temp.g %<>% ungroup()
+
+counter <- 0
+first <- TRUE
+for (k in k6) {
+  counter <- counter + 1
+  print(counter)
+  print(paste(k, collapse = "|"))
+  temp <- temp.g %>%
+    filter(version %in% k) %>%
+    group_by(species) %>%
+    slice_max(auc.valdiff, with_ties = FALSE) %>%
+    ungroup() %>%
+    summarise(n = length(species), AUCdiffSum = sum(auc.valdiff), mean = mean(auc.valdiff), AUCdiffMedian = median(auc.valdiff), AUCdiffQ_025 = quantile(auc.valdiff, 0.25), AUCdiffQ_020 = quantile(auc.valdiff, 0.20), AUCdiffQ_010 = quantile(auc.valdiff, 0.10), AUCdiffQ_005 = quantile(auc.valdiff, 0.05))
+  temp$versionComb <- paste(k, collapse = "|")
+  temp$versionCount <- length(k)
+  if (first) {
+    first <- FALSE
+    res <- temp
+  } else {
+    res %<>% add_row(temp)
+  }
+}
+combs[[as.character(at)]][["val"]]  <- res %<>% arrange(desc(AUCdiffSum))
+  write.csv(res, paste0(path.PP, "combs-val-", as.character(at), ".csv"), row.names = FALSE)
 
 
   ######################
@@ -456,7 +436,7 @@ for (at in auc.tr) {
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
-  ggsave(paste0(path.img, "boxplot.val.test.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
+  ggsave(paste0(path.PP, "boxplot.val.test.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
 
 
   # a) vše
@@ -470,7 +450,7 @@ for (at in auc.tr) {
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~version)
-  ggsave(paste0(path.img, "trend.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP, "trend.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # porovnání přispění verzí per species
   ggplot(temp.g %>% ungroup(), aes(version, auc.valdiff)) +
@@ -483,7 +463,35 @@ for (at in auc.tr) {
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~species)
-  ggsave(paste0(path.img, "version-species.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP, "version-species.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+
+# přispění kombinací
+temp.g %<>% ungroup()
+
+counter <- 0
+first <- TRUE
+for (k in k6) {
+  counter <- counter + 1
+  print(counter)
+  print(paste(k, collapse = "|"))
+  temp <- temp.g %>%
+    filter(version %in% k) %>%
+    group_by(species) %>%
+    slice_max(auc.valdiff, with_ties = FALSE) %>%
+    ungroup() %>%
+    summarise(n = length(species), AUCdiffSum = sum(auc.valdiff), mean = mean(auc.valdiff), AUCdiffMedian = median(auc.valdiff), AUCdiffQ_025 = quantile(auc.valdiff, 0.25), AUCdiffQ_020 = quantile(auc.valdiff, 0.20), AUCdiffQ_010 = quantile(auc.valdiff, 0.10), AUCdiffQ_005 = quantile(auc.valdiff, 0.05))
+  temp$versionComb <- paste(k, collapse = "|")
+  temp$versionCount <- length(k)
+  if (first) {
+    first <- FALSE
+    res <- temp
+  } else {
+    res %<>% add_row(temp)
+  }
+}
+combs[[as.character(at)]][["val.test"]]  <- res %<>% arrange(desc(AUCdiffSum))
+  write.csv(res, paste0(path.PP, "combs-val.test-", as.character(at), ".csv"), row.names = FALSE)
+
 
 
 
@@ -527,7 +535,7 @@ for (at in auc.tr) {
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
-  ggsave(paste0(path.img, "boxplot.test.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
+  ggsave(paste0(path.PP, "boxplot.test.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
 
 
   # a) vše
@@ -541,7 +549,7 @@ for (at in auc.tr) {
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~version)
-  ggsave(paste0(path.img, "trend.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP, "trend.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # porovnání přispění verzí per species
   ggplot(temp.g %>% ungroup(), aes(version, AUCdiff)) +
@@ -554,8 +562,41 @@ for (at in auc.tr) {
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~species)
-  ggsave(paste0(path.img, "version-species.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP, "version-species.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+
+
+# přispění kombinací
+temp.g %<>% ungroup()
+
+counter <- 0
+first <- TRUE
+for (k in k6) {
+  counter <- counter + 1
+  print(counter)
+  print(paste(k, collapse = "|"))
+  temp <- temp.g %>%
+    filter(version %in% k) %>%
+    group_by(species) %>%
+    slice_max(AUCdiff, with_ties = FALSE) %>%
+    ungroup() %>%
+    summarise(n = length(species), AUCdiffSum = sum(AUCdiff), mean = mean(AUCdiff), AUCdiffMedian = median(AUCdiff), AUCdiffQ_025 = quantile(AUCdiff, 0.25), AUCdiffQ_020 = quantile(AUCdiff, 0.20), AUCdiffQ_010 = quantile(AUCdiff, 0.10), AUCdiffQ_005 = quantile(AUCdiff, 0.05))
+  temp$versionComb <- paste(k, collapse = "|")
+  temp$versionCount <- length(k)
+  if (first) {
+    first <- FALSE
+    res <- temp
+  } else {
+    res %<>% add_row(temp)
+  }
 }
+combs[[as.character(at)]][["test"]]  <- res %<>% arrange(desc(AUCdiffSum))
+  write.csv(res, paste0(path.PP, "combs-test-", as.character(at), ".csv"), row.names = FALSE)
+
+
+}
+
+saveRDS(combs, paste0(path.PP, "combs.rds"))
+
 
 summary_zasobnik.t <- t(as_tibble(summary_zasobnik))
 rn <- row.names(summary_zasobnik.t)
@@ -567,10 +608,11 @@ summary_zasobnik.t$treshold <- rn
 summary_zasobnik.t$total <- 110
 summary_zasobnik.t %<>% relocate(treshold) %>% relocate(total)
 
+saveRDS(summary_zasobnik.t, paste0(path.PP, "version-species-treshold-count.rds"))
+write.csv(summary_zasobnik.t, paste0(path.PP, "version-species-treshold-count.csv"), row.names = FALSE)
 
 
-
-
+saveRDS(zasobnik0, paste0(path.PP, "version-species-treshold-count.rds"))
 
 
 
@@ -714,7 +756,7 @@ ggplot(tbl.all %>% ungroup(), aes(x = version, y = AUCdiff)) +
     panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
   )
-ggsave(paste0(path.img, "tbl.simple", ss, ".png"), width = 1500, height = 1000, units = "px")
+ggsave(paste0(path.PP, "tbl.simple", ss, ".png"), width = 1500, height = 1000, units = "px")
 
 
 
@@ -734,7 +776,7 @@ ggsave(paste0(path.img, "tbl.simple", ss, ".png"), width = 1500, height = 1000, 
 #     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
 #   ) +
 #   scale_y_continuous(limits = c(-0.2, 0.3))
-# ggsave(paste0(path.img, "tbl.png"), width = 1500, height = 1000, units = "px")
+# ggsave(paste0(path.PP, "tbl.png"), width = 1500, height = 1000, units = "px")
 
 # vybrat jen ty s dolním kvantilem nad nulou
 
@@ -750,7 +792,7 @@ ggplot(tbl.all %>% ungroup(), aes(occs.n, AUCdiff)) +
     panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
   ) +
   facet_wrap(~version)
-ggsave(paste0(path.img, "tbl.trend-prevalence", ss, ".png"), width = 2000, height = 1500, units = "px")
+ggsave(paste0(path.PP, "tbl.trend-prevalence", ss, ".png"), width = 2000, height = 1500, units = "px")
 
 
 
