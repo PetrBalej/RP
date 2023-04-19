@@ -271,7 +271,7 @@ for (at in ndop.fs$aucTresholds) {
 
   zasobnik <- list()
   for (ver in unique(tbl.nn$version)) {
-    tmp <- tbl.nn %>% filter(version == ver)
+    tmp <- tbl.nn %>% filter(auc.val.avg >= at) %>% filter(version == ver)
     ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
     zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
     zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
