@@ -342,9 +342,9 @@ for (at in auc.tr) {
   #####
 
 
-  #
+  ######################
   # kss auc.valdiff
-  #
+  ######################
 
 
   temp.g <- tbl.nn %>%
@@ -393,15 +393,31 @@ for (at in auc.tr) {
     theme_light() +
     theme(
       legend.position = "none", text = element_text(size = 6),
-      panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
+      panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~version)
   ggsave(paste0(path.img, "trend.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
-  #
-  # kss auc.valdiff test
-  #
 
+  # porovnání přispění verzí per species
+  ggplot(temp.g %>% ungroup(), aes(version, auc.valdiff)) +
+    geom_bar(stat = "identity", aes(fill = factor(version))) +
+    theme_light() +
+    theme(
+      legend.position = "none", text = element_text(size = 4),
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+      panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
+    ) +
+    facet_wrap(~species)
+  ggsave(paste0(path.img, "version-species.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+
+
+
+  ######################
+  # kss auc.valdiff test
+  ######################
 
   temp.g <- tbl.nn %>%
     ungroup() %>%
@@ -450,17 +466,30 @@ for (at in auc.tr) {
     theme_light() +
     theme(
       legend.position = "none", text = element_text(size = 6),
-      panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
+      panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~version)
   ggsave(paste0(path.img, "trend.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
+  # porovnání přispění verzí per species
+  ggplot(temp.g %>% ungroup(), aes(version, auc.valdiff)) +
+    geom_bar(stat = "identity", aes(fill = factor(version))) +
+    theme_light() +
+    theme(
+      legend.position = "none", text = element_text(size = 4),
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+      panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
+    ) +
+    facet_wrap(~species)
+  ggsave(paste0(path.img, "version-species.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
 
-  #
+
+  ######################
   # kss AUCdiff
-  #
-
+  ######################
 
   temp.g <- tbl.nn %>%
     ungroup() %>%
@@ -508,10 +537,24 @@ for (at in auc.tr) {
     theme_light() +
     theme(
       legend.position = "none", text = element_text(size = 6),
-      panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1)
+      panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~version)
   ggsave(paste0(path.img, "trend.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+
+  # porovnání přispění verzí per species
+  ggplot(temp.g %>% ungroup(), aes(version, AUCdiff)) +
+    geom_bar(stat = "identity", aes(fill = factor(version))) +
+    theme_light() +
+    theme(
+      legend.position = "none", text = element_text(size = 4),
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+      panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
+    ) +
+    facet_wrap(~species)
+  ggsave(paste0(path.img, "version-species.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 }
 
 summary_zasobnik.t <- t(as_tibble(summary_zasobnik))
