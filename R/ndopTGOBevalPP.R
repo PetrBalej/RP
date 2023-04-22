@@ -137,9 +137,12 @@ if (file.exists(modelsResults.avg)) {
 }
 
 
-selection <- c("ssos", "ssos.topA100", "ssos.topS10", "ssos2", "ssos2.topA100", "ssos2.topS10", "tgob", "topA100", "topS10", "un")
-selection.f <- c("ssos", "ssos.topA100", "ssos.topS10", "tgob", "topA100", "topS10", "un")
-selection.f2 <- c("ssos2", "ssos2.topA100", "ssos2.topS10", "tgob", "topA100", "topS10", "un")
+selection <- c("ssos.topA100", "ssos.topS10", "ssos2", "ssos2.topA100", "ssos2.topS10", "tgob", "topA100", "topS10", "un", "ssos")
+selection.f <- c("ssos.topA100", "ssos.topS10", "tgob", "topA100", "topS10", "un", "ssos") # soos záměrně na konci
+selection.f2 <- c("ssos2.topA100", "ssos2.topS10", "tgob", "topA100", "topS10", "un", "ssos2")
+selection.rename <- c("ssosTO", "ssosTS", "TGOB", "TO", "TS", "thin", "ssosTGOB")
+names(selection.rename) <- selection.f2
+
 ####
 # tbl %<>% filter(version %in% selection)
 
@@ -186,7 +189,6 @@ tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg"))
   group_by(species, version)
 
 
-
 #
 # porovnání počtu druhů průchozích přes treshold
 #
@@ -194,9 +196,18 @@ tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg"))
 summary_zasobnik <- list()
 zasobnik0 <- list()
 combs <- list()
+
+
+# výběr a přejmenování verzí
+tbl.f <- tbl %>%
+  filter(version %in% selection.f2) %>%
+  ungroup() %>%
+  mutate(version = str_replace_all(version, selection.rename)) %>%
+  group_by(species, version) # final versions selection
+
+selection.f2 <- selection.rename
 k6 <- comb_all(selection.f2, length(selection.f2))
 
-tbl.f <- tbl %>% filter(version %in% selection.f2) # final versions selection
 tbl.nn <- tbl.f %>% filter(id %notin% tbl.null.ids.unique) # not null
 tbl.null <- tbl.f %>% filter(id %in% tbl.null.ids.unique) # null
 
@@ -383,7 +394,11 @@ for (at in ndop.fs$aucTresholds) {
   ggsave(paste0(path.PP, "trend.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
 
+
   # porovnání přispění verzí per species
+  title <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% mutate(title = paste0(species, "\n", round(auc.val_null, digits = 2), " -> ", round(auc.val.avg, digits = 2))) %>% dplyr::select(title)))
+  names(title) <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% dplyr::select(species)))
+
   ggplot(temp.g %>% ungroup(), aes(version, auc.valdiff)) +
     geom_bar(stat = "identity", aes(fill = factor(version))) +
     theme_light() +
@@ -391,9 +406,10 @@ for (at in ndop.fs$aucTresholds) {
       legend.position = "none", text = element_text(size = 4),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
-      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
+      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1)),
+      panel.margin = unit(0.2, "lines")
     ) +
-    facet_wrap(~species)
+    facet_wrap(~species, labeller = as_labeller(title))
   ggsave(paste0(path.PP, "version-species.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # přispění kombinací
@@ -482,6 +498,9 @@ for (at in ndop.fs$aucTresholds) {
   ggsave(paste0(path.PP, "trend.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # porovnání přispění verzí per species
+  title <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% mutate(title = paste0(species, "\n", round(auc.val_null, digits = 2), " -> ", round(auc.val.avg, digits = 2))) %>% dplyr::select(title)))
+  names(title) <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% dplyr::select(species)))
+
   ggplot(temp.g %>% ungroup(), aes(version, auc.valdiff)) +
     geom_bar(stat = "identity", aes(fill = factor(version))) +
     theme_light() +
@@ -489,9 +508,10 @@ for (at in ndop.fs$aucTresholds) {
       legend.position = "none", text = element_text(size = 4),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
-      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
+      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1)),
+      panel.margin = unit(0.2, "lines")
     ) +
-    facet_wrap(~species)
+    facet_wrap(~species, labeller = as_labeller(title))
   ggsave(paste0(path.PP, "version-species.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # přispění kombinací
@@ -581,6 +601,8 @@ for (at in ndop.fs$aucTresholds) {
   ggsave(paste0(path.PP, "trend.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # porovnání přispění verzí per species
+  title <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(AUC, with_ties = FALSE) %>% ungroup() %>% mutate(title = paste0(species, "\n", round(AUC_null, digits = 2), " -> ", round(AUC, digits = 2))) %>% dplyr::select(title)))
+  names(title) <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(AUC, with_ties = FALSE) %>% ungroup() %>% dplyr::select(species)))
   ggplot(temp.g %>% ungroup(), aes(version, AUCdiff)) +
     geom_bar(stat = "identity", aes(fill = factor(version))) +
     theme_light() +
@@ -588,9 +610,10 @@ for (at in ndop.fs$aucTresholds) {
       legend.position = "none", text = element_text(size = 4),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
-      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
+      strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1)),
+      panel.margin = unit(0.2, "lines")
     ) +
-    facet_wrap(~species)
+    facet_wrap(~species, labeller = as_labeller(title))
   ggsave(paste0(path.PP, "version-species.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
 
