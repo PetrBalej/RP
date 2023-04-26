@@ -526,7 +526,7 @@ dev.off()
 
 # dropnout květen - artefakty s nepovedeným švem v JČ a některé bio také artefakty nebo nepřirozené gradienty
 # dropnout červen (2014-2017) - artefakty s nepovedeným švem v Kralický Sněžník a některé bio také artefakty nebo nepřirozené gradienty
-raster_stack <- dropLayer(raster_stack, grep("_5_|bio03|bio08|bio09|bio15|cv.bio", names(raster_stack), ignore.case = TRUE))
+raster_stack <- dropLayer(raster_stack, grep("_5_|bio03|bio08|bio09|bio15|cv", names(raster_stack), ignore.case = TRUE))
 length(names(raster_stack)) # 60
 
 
@@ -561,7 +561,7 @@ raster_stack_vifs <- raster_stack[[vs.vc@results$Variables]]
 # raster_stack_vifs <- readRDS(paste0(path.wd.prep, "preds_final_vifs.rds"))
 
 raster_stack_vifs <- raster::mask(raster_stack_vifs, sum(raster_stack_vifs))
-raster_stack_vifs <- raster_stack_vifs2
+
 replaceExtreme <- function(x) {
     # především pro úlety z CV
     quantiles <- quantile(x, c(.0001, .9999))
@@ -581,6 +581,7 @@ for (rn in names(raster_stack_vifs)) {
     raster_stack_vifs[[rn]] <- ((raster_stack_vifs[[rn]] - r.min) / (r.max - r.min))
     raster_stack_vifs[[rn]] <- setMinMax(raster_stack_vifs[[rn]])
 }
+raster_stack_vifs <- raster::mask(raster_stack_vifs, sum(raster_stack_vifs))
 # #  hist(raster_stack_vifs[[1]])
 plot(raster_stack_vifs)
 vif(raster_stack_vifs)

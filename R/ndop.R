@@ -279,9 +279,9 @@ nrow(ndop.POLE)
 length(unique(ndop$DRUH))
 
 
-# omezení: modeluju jen druhy které můžu z LSD ověřit (v budoucnu za dalších podmínek klidně všechny...)
-ndop %<>% filter(DRUH %in% unique(lsd.pa.min$TaxonNameLAT))
-ndop.POLE %<>% filter(DRUH %in% unique(lsd.pa.min$TaxonNameLAT))
+# # omezení: modeluju jen druhy které můžu z LSD ověřit (v budoucnu za dalších podmínek klidně všechny...) - v základu nechávám všechny (abych měl top druhy), doomezuju až při modelování
+# ndop %<>% filter(DRUH %in% unique(lsd.pa.min$TaxonNameLAT))
+# ndop.POLE %<>% filter(DRUH %in% unique(lsd.pa.min$TaxonNameLAT))
 
 saveRDS(ndop, paste0(path.ndop, "ndopP.rds"))
 saveRDS(ndop.POLE, paste0(path.ndop, "ndopP.POLE.rds"))
