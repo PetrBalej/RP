@@ -73,7 +73,7 @@ ndopP <- readRDS(paste0(path.ndop, "ndopP.rds")) %>% dplyr::select(POLE, DRUH, A
 ndopP.POLE <- readRDS(paste0(path.ndop, "ndopP.POLE.rds")) %>% dplyr::select(POLE, DRUH, AUTOR)
 
 # LSD PA
-# lsd.pa.centroids <- readRDS(paste0(path.lsd, "lsd.pa.centroids.rds"))  %>% filter(POLE != "5260ca") # krkonoše, nejsou v prediktorech (automatizovat odebrání!!) - až v evaluaci
+lsd.pa.centroids <- readRDS(paste0(path.lsd, "lsd.pa.centroids.rds")) %>% filter(POLE != "5260ca") # krkonoše, nejsou v prediktorech (automatizovat odebrání!!) - až v evaluaci
 lsd.pa.min <- readRDS(paste0(path.lsd, "lsd.pa.min.rds"))
 
 # statistiky NDOP druhy
@@ -122,6 +122,47 @@ ndop.fs <- list(
 # odstraním prezence (sites) LSD z NDOP pro zabráníení spatial (auto)correlation - LSD tak bude i prostorově nezávislý dataset
 
 "%notin%" <- Negate("%in%")
+
+
+evalIndep <- function(m, lsd.temp) {
+    first <- TRUE
+    out.t <- NA
+    for (layer in names(m@predictions)) { # v případě rozdělení per RM+FC je cyklus zbytečný (ale preventivně nechat), je tam jen jeden RasterLayer
+        ev <- NA
+        r.temp <- m@predictions[[layer]]
+        ex.predicted <- extract(r.temp, st_coordinates(lsd.temp))
+        #
+        # dopočíst a přidat další metriky z performance() (rgee)!!!
+        # tam ale není nic co zohledňuje tn tp (bez poměru k fp)
+        #
+
+        if (inherits(try({
+            ev <- sdm::evaluates(lsd.temp$presence, ex.predicted)
+        }), "try-error")) {
+            ev <- NA
+        }
+        if (is.na(ev)) {
+            next
+        }
+        ev.temp <- as.data.frame(ev@statistics[-3])
+        ev.temp <- merge(ev.temp, t(as.data.frame(ev@statistics$COR)))
+        ev.temp <- merge(ev.temp, ev@threshold_based[2, ]) # max(se+sp)
+        ev.temp <- as.data.frame(ev@statistics[-3])
+        ev.temp <- merge(ev.temp, t(as.data.frame(ev@statistics$COR)))
+        # max(se+sp)
+        ev.temp <- merge(ev.temp, ev@threshold_based[2, ])
+        ev.temp[["tune.args"]] <- layer
+        if (first) {
+            first <- FALSE
+            out.t <- ev.temp
+        } else {
+            out.t %<>% add_row(ev.temp)
+        }
+    }
+
+    return(out.t)
+}
+
 
 # kešovat
 fn <- paste0(path.tgob, "tgobV.rds")
@@ -214,9 +255,8 @@ for (rep in 1:ndop.fs$replicates) {
     ### nové null ze sample()?
     null.default <- sample(predictors[[1]])
 
-    first <- TRUE
     for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$speciesPart]] c("Turdus viscivorus")
-
+        first <- TRUE # pro každou replikaci a druh samostatný soubor
         collector <- list()
         collector.thin <- list()
         print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
@@ -224,8 +264,11 @@ for (rep in 1:ndop.fs$replicates) {
         print(sp.group)
         print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
         e.mx.all <- list()
+        out.t <- list()
         bg.col <- list()
-
+        # LSD
+        lsd.temp <- NA
+        lsd.temp <- lsd.pa.centroids %>% filter(TaxonNameLAT == druh)
         #
         # základní verze backgroundů
         #
@@ -353,9 +396,9 @@ for (rep in 1:ndop.fs$replicates) {
                     # RM
                     for (RM in tune.args$rm) {
                         tune.args.ind <- list("fc" = FC, "rm" = RM)
-
+                        ee.temp <- NA
                         if (inherits(try({
-                            e.mx.all[[druh]][[id]][[adjust]][[FC]][[as.character(RM)]] <- ENMevaluate(
+                            ee.temp <- ENMevaluate(
                                 user.grp = list("occs.grp" = block.p$fold, "bg.grp" = block.bg$fold),
                                 occs = df.temp,
                                 envs = predictors,
@@ -365,6 +408,24 @@ for (rep in 1:ndop.fs$replicates) {
                                 tune.args = tune.args.ind,
                                 other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
                             )
+                            e.mx.all[[druh]][[id]][[adjust]][[FC]][[as.character(RM)]] <- ee.temp
+                            # export results + add indep test
+                            ei <- evalIndep(ee.temp, lsd.temp)
+
+                            ee.temp@results[["species"]] <- druh
+                            ee.temp@results[["version"]] <- id
+                            ee.temp@results[["adjust"]] <- adjust
+
+                            temp.t <- ee.temp@results %>% left_join(ei, by = "tune.args")
+
+                            temp.t$occs.n <- nrow(ee.temp@occs)
+
+                            if (first) {
+                                first <- FALSE
+                                out.t <- temp.t
+                            } else {
+                                out.t %<>% add_row(temp.t)
+                            }
                         }), "try-error")) {
                             e.mx.all[[druh]][[id]][[adjust]][[FC]][[as.character(RM)]] <- NA
                         }
@@ -379,9 +440,9 @@ for (rep in 1:ndop.fs$replicates) {
                                 print("měním presenční dataset pro thinnovací verze")
 
                                 block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
-
+                                ee.temp <- NA
                                 if (inherits(try({
-                                    e.mx.all[[druh]][[id]][[thinDist]][[FC]][[as.character(RM)]] <- ENMevaluate(
+                                    ee.temp <- ENMevaluate(
                                         user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
                                         occs = df.temp.thin,
                                         envs = predictors,
@@ -391,6 +452,25 @@ for (rep in 1:ndop.fs$replicates) {
                                         tune.args = tune.args.ind,
                                         other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
                                     )
+                                    e.mx.all[[druh]][[id]][[thinDist]][[FC]][[as.character(RM)]] <- ee.temp
+
+                                    # export results + add indep test (thin)
+                                    ei <- evalIndep(ee.temp, lsd.temp)
+
+                                    ee.temp@results[["species"]] <- druh
+                                    ee.temp@results[["version"]] <- id
+                                    ee.temp@results[["adjust"]] <- adjust
+
+                                    temp.t <- ee.temp@results %>% left_join(ei, by = "tune.args")
+
+                                    temp.t$occs.n <- nrow(ee.temp@occs)
+
+                                    if (first) {
+                                        first <- FALSE
+                                        out.t <- temp.t
+                                    } else {
+                                        out.t %<>% add_row(temp.t)
+                                    }
                                 }), "try-error")) {
                                     e.mx.all[[druh]][[id]][[thinDist]][[FC]][[as.character(RM)]] <- NA
                                 }
@@ -401,7 +481,8 @@ for (rep in 1:ndop.fs$replicates) {
             }
         }
 
-        saveRDS(e.mx.all, paste0(path.tgob, "4ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
+        saveRDS(e.mx.all, paste0(path.tgob, "5ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
+        saveRDS(out.t, paste0(path.tgob, "t_5ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
         gc()
     }
 }

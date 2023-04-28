@@ -157,7 +157,7 @@ for (fpath in rds_list) {
                         # tam ale není nic co zohledňuje tn tp (bez poměru k fp)
                         #
 
-                        # _přidat_ partial pROC verzi!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
                         if (inherits(try({
                             ev <- sdm::evaluates(lsd.temp$presence, ex.predicted)
                         }), "try-error")) {
