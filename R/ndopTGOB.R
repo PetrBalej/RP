@@ -190,6 +190,49 @@ if (length(sp.diff) > 0) {
     print("Problém s nejednotnou taxonomií nebo neprůnikem LSD druhů s NDOP druhy!")
 }
 
+# fronta
+
+que <- function(replicates, ndop.stat.res.sp.selected, path.tgob) {
+    out <- list("species" = NA, "replicates" = NA)
+    que.fn <- "que.rds"
+    if (file.exists(paste0(path.tgob, que.fn))) {
+        print("načítám existující que.rds")
+        que <- readRDS(paste0(path.tgob, que.fn))
+    } else {
+        print("generuju nový que.rds")
+        que <- ndop.stat.res.sp.selected %>% arrange(POLE.n)
+        que$rep <- 0
+        que$lock <- 0
+        saveRDS(que, paste0(path.tgob, que.fn))
+    }
+
+    if (nrow(que %>% filter(lock == 1)) > 0) {
+        print("čekání")
+        Sys.sleep(1)
+        que(replicates, ndop.stat.res.sp.selected, path.tgob)
+    } else {
+        print("výběr")
+        que$lock <- 1
+        saveRDS(que, paste0(path.tgob, que.fn))
+
+        que.r <- que %>%
+            filter(rep < replicates) %>%
+            arrange(POLE.n) %>%
+            slice_head(n = 1)
+
+        if (nrow(que.r) > 0) {
+            print("update")
+            que <- dplyr::rows_update(que, que %>% filter(rep < replicates) %>% arrange(POLE.n) %>% slice_head(n = 1) %>% mutate(rep = rep + 1))
+            que$lock <- 0
+            saveRDS(que, paste0(path.tgob, que.fn))
+            return(list("species" = as.character(unname(unlist(que.r$DRUH))), "replicates" = as.numeric(unname(unlist(que.r$rep))) + 1))
+        } else {
+            return(out)
+        }
+    }
+}
+
+
 # druhy s malým počtem presencí se počítají mnohem rychleji, chci tyto per group upřednostnit (seřadit rovnoměrně v rámci skupin druhy od nejméně početných)
 ndop.stat.res.sp.selected %<>% mutate(nthGroup = NA)
 rowsTotal <- nrow(ndop.stat.res.sp.selected)
@@ -241,7 +284,16 @@ sp.group <- ndop.stat.res.sp.selected.regrouped %>% filter(nthGroup == ndop.fs$s
 
 
 
-for (rep in 1:ndop.fs$replicates) {
+repeat {
+    rs <- que(ndop.fs$replicates, ndop.stat.res.sp.selected, path.tgob)
+
+    if (sum(is.na(rs)) > 0) {
+        # obsahuje druh a počet replikací? - bez toho ukončím modelování
+        break
+    }
+
+    rep <- rs$replicates
+    druh <- rs$species
     print("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
     print(rep)
     set.seed(rep)
@@ -288,236 +340,236 @@ for (rep in 1:ndop.fs$replicates) {
     ### nové null ze sample()?
     null.default <- sample(predictors[[1]])
 
-    for (druh in sp.group$DRUH) { #  as.vector(sp.group$DRUH) speciesParts[[ndop.fs$speciesPart]] c("Turdus viscivorus")
-        first <- TRUE # pro každou replikaci a druh samostatný soubor
-        collector <- list()
-        collector.thin <- list()
-        print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-        print(druh)
-        print(sp.group)
-        print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-        e.mx.all <- list()
-        out.t <- list()
-        bg.col <- list()
-        # LSD
-        lsd.temp <- NA
-        lsd.temp <- lsd.pa.centroids %>% filter(TaxonNameLAT == druh)
-        #
-        # základní verze backgroundů
-        #
+    #  for (druh in sp.group$DRUH) { # for DRUH
+    first <- TRUE # pro každou replikaci a druh samostatný soubor
+    collector <- list()
+    collector.thin <- list()
+    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print(druh)
+    print(sp.group)
+    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    e.mx.all <- list()
+    out.t <- list()
+    bg.col <- list()
+    # LSD
+    lsd.temp <- NA
+    lsd.temp <- lsd.pa.centroids %>% filter(TaxonNameLAT == druh)
+    #
+    # základní verze backgroundů
+    #
 
-        # TGOB ssos
-        ssos.sp <- cn_prefix[str_detect(cn_prefix, paste0(druh, "$"))]
+    # TGOB ssos
+    ssos.sp <- cn_prefix[str_detect(cn_prefix, paste0(druh, "$"))]
 
-        versions.base <- c("TGOB", "TO", "TS")
+    versions.base <- c("TGOB", "TO", "TS")
 
-        for (vn in versions.base) {
-            print("----------------------------------------------------------------------------------")
-            print(vn)
+    for (vn in versions.base) {
+        print("----------------------------------------------------------------------------------")
+        print(vn)
+        p.temp <- NA
+        # základní verze
+        if (vn == "TGOB") {
+            p.temp <- tgobV$t %>% dplyr::select(geometry)
+        } else {
+            p.temp <- tgobV$t %>%
+                filter(!!sym(paste0(prefix, vn)) == 1) %>%
+                dplyr::select(geometry)
+        }
+        if (nrow(p.temp) < 1) {
+            print("neexistují presence základní verze!!!")
+            next
+        }
+        collector[[vn]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = "bg", anisotropic = TRUE)
+
+        # ssos podverze ze základních
+        for (vn.ssos in ssos.sp) {
             p.temp <- NA
-            # základní verze
+            vns <- paste0(strsplit(vn.ssos, "_")[[1]][2], vn)
+            print("-------------")
+            print(vns)
             if (vn == "TGOB") {
-                p.temp <- tgobV$t %>% dplyr::select(geometry)
+                p.temp <- tgobV$t %>%
+                    filter(!!sym(vn.ssos) == 1) %>%
+                    dplyr::select(geometry)
             } else {
                 p.temp <- tgobV$t %>%
                     filter(!!sym(paste0(prefix, vn)) == 1) %>%
+                    filter(!!sym(vn.ssos) == 1) %>%
                     dplyr::select(geometry)
             }
+
             if (nrow(p.temp) < 1) {
-                print("neexistují presence základní verze!!!")
+                print("neexistují presence ssos podverze!!!")
                 next
             }
-            collector[[vn]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = "bg", anisotropic = TRUE)
 
-            # ssos podverze ze základních
-            for (vn.ssos in ssos.sp) {
-                p.temp <- NA
-                vns <- paste0(strsplit(vn.ssos, "_")[[1]][2], vn)
-                print("-------------")
-                print(vns)
-                if (vn == "TGOB") {
-                    p.temp <- tgobV$t %>%
-                        filter(!!sym(vn.ssos) == 1) %>%
-                        dplyr::select(geometry)
-                } else {
-                    p.temp <- tgobV$t %>%
-                        filter(!!sym(paste0(prefix, vn)) == 1) %>%
-                        filter(!!sym(vn.ssos) == 1) %>%
-                        dplyr::select(geometry)
-                }
-
-                if (nrow(p.temp) < 1) {
-                    print("neexistují presence ssos podverze!!!")
-                    next
-                }
-
-                collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = "bg", anisotropic = TRUE)
-            }
+            collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = "bg", anisotropic = TRUE)
         }
+    }
 
 
-        gc()
+    gc()
 
-        pres <- ndopP %>% filter(DRUH == druh)
+    pres <- ndopP %>% filter(DRUH == druh)
 
-        pres.unique <- ndopP.POLE %>%
-            filter(DRUH == druh) %>%
-            group_by(POLE) %>%
-            slice_head(n = 1) %>%
-            st_centroid() %>%
-            dplyr::select(-everything())
+    pres.unique <- ndopP.POLE %>%
+        filter(DRUH == druh) %>%
+        group_by(POLE) %>%
+        slice_head(n = 1) %>%
+        st_centroid() %>%
+        dplyr::select(-everything())
 
-        # presence do modelu a k thinningu
-        df.temp <- as.data.frame(st_coordinates(pres.unique))
-        names(df.temp) <- ll
+    # presence do modelu a k thinningu
+    df.temp <- as.data.frame(st_coordinates(pres.unique))
+    names(df.temp) <- ll
 
-        # pro thinning - rozsahy
-        sq2rad.dist <- ndop.fs$sq2rad[1] + 0.00001 # delší strana kvadrátu, přičtení drobné vzdálenosti
-        sq2rad.dist.range <- sq2rad.dist * ndop.fs$sq2radDist
+    # pro thinning - rozsahy
+    sq2rad.dist <- ndop.fs$sq2rad[1] + 0.00001 # delší strana kvadrátu, přičtení drobné vzdálenosti
+    sq2rad.dist.range <- sq2rad.dist * ndop.fs$sq2radDist
 
-        # # buffer kolem presencí
-        # # náhodně může vznikat více typů geometrií, pak to spadne do sfc_GEOMETRY, to nechci (neumí s tím pak pracovat dále některé funkce), vybírám pouze (MULTI)POLYGON
-        # # buffer je 4*strana 2rad, od středu kvadrátu tedy cca 12 km, reálně mi jde o to získat buffer cca 3 čtverců okolo sousedících
-        # pres.unique.buffer <- st_as_sf(st_union(st_buffer(pres.unique, 10000))) %>% filter(st_geometry_type(x) %in% c("MULTIPOLYGON", "POLYGON"))
-        # predictors.ssos.buffer <- mask(predictors[[1]], pres.unique.buffer)
-
-
-        tgob.trad.tm <- tgob.trad.sp %>% filter(DRUH == druh)
-        tgob.trad.tm.df <- as.data.frame(st_coordinates(tgob.trad.tm))
-        colnames(tgob.trad.tm.df) <- c("x", "y")
-
-        # # # buffer
-        # id <- paste(c("area", "buffer"), collapse = "_")
-        # collector.temp <- list()
-        # collector.temp[["bg"]][["0"]] <- st_as_sf(rasterToPoints(kss[["buffer"]], spatial = TRUE)) %>% dplyr::select(-everything()) # vizuální kontrola!!!
-        # collector[[id]] <- collector.temp
-
-        #
-        # un je fix sám o sobě, přidám
-        #
-        # id <- paste(c("cz", "un"), collapse = "_")
-        id <- "un"
-        collector[[id]][["bg"]][["0"]] <- null.default
+    # # buffer kolem presencí
+    # # náhodně může vznikat více typů geometrií, pak to spadne do sfc_GEOMETRY, to nechci (neumí s tím pak pracovat dále některé funkce), vybírám pouze (MULTI)POLYGON
+    # # buffer je 4*strana 2rad, od středu kvadrátu tedy cca 12 km, reálně mi jde o to získat buffer cca 3 čtverců okolo sousedících
+    # pres.unique.buffer <- st_as_sf(st_union(st_buffer(pres.unique, 10000))) %>% filter(st_geometry_type(x) %in% c("MULTIPOLYGON", "POLYGON"))
+    # predictors.ssos.buffer <- mask(predictors[[1]], pres.unique.buffer)
 
 
-        # thinning  presencí pro UN
-        for (thinDist in sq2rad.dist.range) {
-            occs.thinned <- ecospat.occ.desaggregation(xy = tgob.trad.tm.df, min.dist = thinDist, by = NULL)
-            thinDist <- as.character(thinDist)
-            collector.thin[[id]][[thinDist]] <- occs.thinned %>% st_as_sf(coords = c("x", "y"), crs = 4326)
-        }
+    tgob.trad.tm <- tgob.trad.sp %>% filter(DRUH == druh)
+    tgob.trad.tm.df <- as.data.frame(st_coordinates(tgob.trad.tm))
+    colnames(tgob.trad.tm.df) <- c("x", "y")
 
-        gc()
-        # run vsech variant BG s ENMeval
-        for (id in names(collector)) {
-            # id.names <- unlist(strsplit(id, "_"))
+    # # # buffer
+    # id <- paste(c("area", "buffer"), collapse = "_")
+    # collector.temp <- list()
+    # collector.temp[["bg"]][["0"]] <- st_as_sf(rasterToPoints(kss[["buffer"]], spatial = TRUE)) %>% dplyr::select(-everything()) # vizuální kontrola!!!
+    # collector[[id]] <- collector.temp
 
-            print(id)
-            for (adjust in names(collector[[id]][["bg"]])) {
-                print(adjust)
+    #
+    # un je fix sám o sobě, přidám
+    #
+    # id <- paste(c("cz", "un"), collapse = "_")
+    id <- "un"
+    collector[[id]][["bg"]][["0"]] <- null.default
 
-                bg.temp <- as.data.frame(st_coordinates(collector[[id]][["bg"]][[adjust]]))
-                names(bg.temp) <- ll
 
-                block.bg <- collector[[id]][["bg"]][[adjust]] %>% st_join(bCV.poly)
-                block.p <- pres.unique %>% st_join(bCV.poly)
+    # thinning  presencí pro UN
+    for (thinDist in sq2rad.dist.range) {
+        occs.thinned <- ecospat.occ.desaggregation(xy = tgob.trad.tm.df, min.dist = thinDist, by = NULL)
+        thinDist <- as.character(thinDist)
+        collector.thin[[id]][[thinDist]] <- occs.thinned %>% st_as_sf(coords = c("x", "y"), crs = 4326)
+    }
 
-                print("základní:")
+    gc()
+    # run vsech variant BG s ENMeval
+    for (id in names(collector)) {
+        # id.names <- unlist(strsplit(id, "_"))
 
-                # FC
-                for (FC in tune.args$fc) {
-                    # RM
-                    for (RM in tune.args$rm) {
-                        tune.args.ind <- list("fc" = FC, "rm" = RM)
-                        ee.temp <- NA
-                        if (inherits(try({
-                            ee.temp <- ENMevaluate(
-                                user.grp = list("occs.grp" = block.p$fold, "bg.grp" = block.bg$fold),
-                                occs = df.temp,
-                                envs = predictors,
-                                bg = bg.temp,
-                                algorithm = "maxnet", partitions = "user",
-                                # partition.settings = list("kfolds" = 3),
-                                tune.args = tune.args.ind,
-                                other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
-                            )
-                            e.mx.all[[druh]][[id]][[adjust]][[FC]][[as.character(RM)]] <- ee.temp
-                            # export results + add indep test
-                            ei <- evalIndep(ee.temp, lsd.temp)
+        print(id)
+        for (adjust in names(collector[[id]][["bg"]])) {
+            print(adjust)
 
-                            ee.temp@results[["species"]] <- druh
-                            ee.temp@results[["version"]] <- id
-                            ee.temp@results[["adjust"]] <- adjust
+            bg.temp <- as.data.frame(st_coordinates(collector[[id]][["bg"]][[adjust]]))
+            names(bg.temp) <- ll
 
-                            temp.t <- ee.temp@results %>% left_join(ei, by = "tune.args")
+            block.bg <- collector[[id]][["bg"]][[adjust]] %>% st_join(bCV.poly)
+            block.p <- pres.unique %>% st_join(bCV.poly)
 
-                            temp.t$occs.n <- nrow(ee.temp@occs)
+            print("základní:")
 
-                            if (first) {
-                                first <- FALSE
-                                out.t <- temp.t
-                            } else {
-                                out.t %<>% add_row(temp.t)
-                            }
-                        }), "try-error")) {
-                            e.mx.all[[druh]][[id]][[adjust]][[FC]][[as.character(RM)]] <- NA
+            # FC
+            for (FC in tune.args$fc) {
+                # RM
+                for (RM in tune.args$rm) {
+                    tune.args.ind <- list("fc" = FC, "rm" = RM)
+                    ee.temp <- NA
+                    if (inherits(try({
+                        ee.temp <- ENMevaluate(
+                            user.grp = list("occs.grp" = block.p$fold, "bg.grp" = block.bg$fold),
+                            occs = df.temp,
+                            envs = predictors,
+                            bg = bg.temp,
+                            algorithm = "maxnet", partitions = "user",
+                            # partition.settings = list("kfolds" = 3),
+                            tune.args = tune.args.ind,
+                            other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
+                        )
+                        e.mx.all[[druh]][[id]][[adjust]][[FC]][[as.character(RM)]] <- ee.temp
+                        # export results + add indep test
+                        ei <- evalIndep(ee.temp, lsd.temp)
+
+                        ee.temp@results[["species"]] <- druh
+                        ee.temp@results[["version"]] <- id
+                        ee.temp@results[["adjust"]] <- adjust
+
+                        temp.t <- ee.temp@results %>% left_join(ei, by = "tune.args")
+
+                        temp.t$occs.n <- nrow(ee.temp@occs)
+
+                        if (first) {
+                            first <- FALSE
+                            out.t <- temp.t
+                        } else {
+                            out.t %<>% add_row(temp.t)
                         }
+                    }), "try-error")) {
+                        e.mx.all[[druh]][[id]][[adjust]][[FC]][[as.character(RM)]] <- NA
+                    }
 
-                        # varianta s thinningem presencí přidaných do UN
-                        if ("un" == id) {
-                            print("thin:")
-                            for (thinDist in names(collector.thin[[id]])) {
-                                df.temp.thin <- as.data.frame(st_coordinates(collector.thin[[id]][[thinDist]]))
-                                names(df.temp.thin) <- ll
-                                # podstrčit thinning presence místo původních
-                                print("měním presenční dataset pro thinnovací verze")
+                    # varianta s thinningem presencí přidaných do UN
+                    if ("un" == id) {
+                        print("thin:")
+                        for (thinDist in names(collector.thin[[id]])) {
+                            df.temp.thin <- as.data.frame(st_coordinates(collector.thin[[id]][[thinDist]]))
+                            names(df.temp.thin) <- ll
+                            # podstrčit thinning presence místo původních
+                            print("měním presenční dataset pro thinnovací verze")
 
-                                block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
-                                ee.temp <- NA
-                                if (inherits(try({
-                                    ee.temp <- ENMevaluate(
-                                        user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
-                                        occs = df.temp.thin,
-                                        envs = predictors,
-                                        bg = bg.temp,
-                                        algorithm = "maxnet", partitions = "user",
-                                        # partition.settings = list("kfolds" = 3),
-                                        tune.args = tune.args.ind,
-                                        other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
-                                    )
-                                    e.mx.all[[druh]][[id]][[thinDist]][[FC]][[as.character(RM)]] <- ee.temp
+                            block.pt <- collector.thin[[id]][[thinDist]] %>% st_join(bCV.poly)
+                            ee.temp <- NA
+                            if (inherits(try({
+                                ee.temp <- ENMevaluate(
+                                    user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
+                                    occs = df.temp.thin,
+                                    envs = predictors,
+                                    bg = bg.temp,
+                                    algorithm = "maxnet", partitions = "user",
+                                    # partition.settings = list("kfolds" = 3),
+                                    tune.args = tune.args.ind,
+                                    other.settings = list("addsamplestobackground" = FALSE, "other.args" = list("addsamplestobackground" = FALSE))
+                                )
+                                e.mx.all[[druh]][[id]][[thinDist]][[FC]][[as.character(RM)]] <- ee.temp
 
-                                    # export results + add indep test (thin)
-                                    ei <- evalIndep(ee.temp, lsd.temp)
+                                # export results + add indep test (thin)
+                                ei <- evalIndep(ee.temp, lsd.temp)
 
-                                    ee.temp@results[["species"]] <- druh
-                                    ee.temp@results[["version"]] <- id
-                                    ee.temp@results[["adjust"]] <- adjust
+                                ee.temp@results[["species"]] <- druh
+                                ee.temp@results[["version"]] <- id
+                                ee.temp@results[["adjust"]] <- adjust
 
-                                    temp.t <- ee.temp@results %>% left_join(ei, by = "tune.args")
+                                temp.t <- ee.temp@results %>% left_join(ei, by = "tune.args")
 
-                                    temp.t$occs.n <- nrow(ee.temp@occs)
+                                temp.t$occs.n <- nrow(ee.temp@occs)
 
-                                    if (first) {
-                                        first <- FALSE
-                                        out.t <- temp.t
-                                    } else {
-                                        out.t %<>% add_row(temp.t)
-                                    }
-                                }), "try-error")) {
-                                    e.mx.all[[druh]][[id]][[thinDist]][[FC]][[as.character(RM)]] <- NA
+                                if (first) {
+                                    first <- FALSE
+                                    out.t <- temp.t
+                                } else {
+                                    out.t %<>% add_row(temp.t)
                                 }
+                            }), "try-error")) {
+                                e.mx.all[[druh]][[id]][[thinDist]][[FC]][[as.character(RM)]] <- NA
                             }
                         }
                     }
                 }
             }
         }
-
-        saveRDS(e.mx.all, paste0(path.tgob, "5ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
-        saveRDS(out.t, paste0(path.tgob, "t_5ssos_", druh, "_", ndop.fs$speciesPart, "_", rep, ".rds"))
-        gc()
     }
+
+    saveRDS(e.mx.all, paste0(path.tgob, "5ssos_", druh, "_", rep, ".rds"))
+    saveRDS(out.t, paste0(path.tgob, "t_5ssos_", druh, "_", rep, ".rds"))
+    gc()
+    # } # for DRUH
 }
 end_time <- Sys.time()
 print(end_time - start_time)
