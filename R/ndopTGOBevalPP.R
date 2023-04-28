@@ -50,7 +50,7 @@ lsd.pa.centroids <- readRDS(paste0(path.lsd, "lsd.pa.centroids.rds")) %>% filter
 # settings
 ############
 
-ndop.fs <- list("aucTresholds" = c(0.00, 0.70, 0.75), "version" = "v1")
+ndop.fs <- list("aucTresholds" = c(0.00, 0.70), "version" = "v1")
 
 ############
 # execution
@@ -135,12 +135,12 @@ if (file.exists(modelsResults.avg)) {
   tbl %<>% ungroup() %>% mutate(id = row_number())
   saveRDS(tbl, paste0(path.eval, "tbl.rds"))
 }
+# vu <- unique(tbl$version)
 
-
-selection <- c("ssos.topA100", "ssos.topS10", "ssos2", "ssos2.topA100", "ssos2.topS10", "tgob", "topA100", "topS10", "un", "ssos")
-selection.f <- c("ssos.topA100", "ssos.topS10", "tgob", "topA100", "topS10", "un", "ssos") # soos záměrně na konci
-selection.f2 <- c("ssos2.topA100", "ssos2.topS10", "tgob", "topA100", "topS10", "un", "ssos2")
-selection.rename <- c("ssosTO", "ssosTS", "TGOB", "TO", "TS", "thin", "ssosTGOB")
+selection <- c("TGOB", "TO", "TS", "ssos2TGOB", "ssos2TO", "ssos2TS", "un")
+# selection.f <- c("ssos.topA100", "ssos.topS10", "tgob", "topA100", "topS10", "un", "ssos") # soos záměrně na konci
+selection.f2 <- c("TGOB", "TO", "TS", "ssos2TGOB", "ssos2TO", "ssos2TS", "un")
+selection.rename <- c("TGOB", "TO", "TS", "ssosTGOB", "ssosTO", "ssosTS", "thin")
 names(selection.rename) <- selection.f2
 
 ####

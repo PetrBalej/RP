@@ -69,7 +69,7 @@ lsd.pa.centroids <- readRDS(paste0(path.lsd, "lsd.pa.centroids.rds")) %>% filter
 # settings
 ############
 
-ndop.fs <- list("groups" = 55, "version" = "v1")
+ndop.fs <- list("groups" = 37, "version" = "v1")
 
 ############
 # execution
@@ -82,7 +82,7 @@ lsd.pa.centroids.species <- unlist(unique(lsd.pa.centroids$TaxonNameLAT))
 rds_list <-
     list.files(
         path.models,
-        pattern = paste0("^3ssos_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
+        pattern = paste0("^4ssos_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
         ignore.case = TRUE,
         full.names = TRUE
     )
