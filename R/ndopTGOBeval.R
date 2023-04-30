@@ -13,7 +13,7 @@ print(cmd_arg)
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
-required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "geosphere", "ENMeval", "sdm") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
+required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "sdmATM") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
 
 install.packages(setdiff(required_packages, rownames(installed.packages())))
 
@@ -69,7 +69,7 @@ lsd.pa.centroids <- readRDS(paste0(path.lsd, "lsd.pa.centroids.rds")) %>% filter
 # settings
 ############
 
-ndop.fs <- list("groups" = 37, "version" = "v1")
+ndop.fs <- list("groups" = 55, "version" = "v1")
 
 ############
 # execution
@@ -82,7 +82,7 @@ lsd.pa.centroids.species <- unlist(unique(lsd.pa.centroids$TaxonNameLAT))
 rds_list <-
     list.files(
         path.models,
-        pattern = paste0("^4ssos_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
+        pattern = paste0("^5ssos_"), # !!! skillc je samostatná dodělávka všech 116 druhů dohromady 20-22 variant
         ignore.case = TRUE,
         full.names = TRUE
     )
@@ -159,7 +159,7 @@ for (fpath in rds_list) {
 
 
                         if (inherits(try({
-                            ev <- sdm::evaluates(lsd.temp$presence, ex.predicted)
+                            ev <- sdmATM::evaluates(lsd.temp$presence, ex.predicted)
                         }), "try-error")) {
                             ev <- NA
                         }
@@ -168,11 +168,7 @@ for (fpath in rds_list) {
                         }
                         ev.temp <- as.data.frame(ev@statistics[-3])
                         ev.temp <- merge(ev.temp, t(as.data.frame(ev@statistics$COR)))
-                        ev.temp <- merge(ev.temp, ev@threshold_based[2, ]) # max(se+sp)
-                        ev.temp <- as.data.frame(ev@statistics[-3])
-                        ev.temp <- merge(ev.temp, t(as.data.frame(ev@statistics$COR)))
-                        # max(se+sp)
-                        ev.temp <- merge(ev.temp, ev@threshold_based[2, ])
+                        ev.temp <- merge(ev.temp, ev@threshold_based[1, ]) # sp=se
                         ev.temp[["tune.args"]] <- layer
                         if (second) {
                             second <- FALSE
@@ -190,13 +186,6 @@ for (fpath in rds_list) {
                     occs <- rds.l[[sp]][[version]][[adjust]][[FC]][[RM]]@occs
                     temp.t$occs.n <- nrow(occs)
 
-                    temp.t$bg.n <- nrow(rds.l[[sp]][[version]][[adjust]][[FC]][[RM]]@bg)
-                    # LSD
-                    temp.t$p.n <- nrow(lsd.temp %>% filter(presence == 1))
-                    temp.t$a.n <- nrow(lsd.temp %>% filter(presence == 0))
-                    # temp.t$p.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 1)))
-                    # temp.t$a.wkt <- st_as_text(st_combine(lsd.temp %>% filter(presence == 0)))
-                    # temp.t$occs.wkt <- st_as_text(st_combine(occs %>% st_as_sf(coords = c("longitude", "latitude"), crs = 4326)))
 
                     if (first) {
                         first <- FALSE

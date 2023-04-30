@@ -110,7 +110,7 @@ ndop.fs <- list(
     "speciesPerGroup" = 2, "speciesOccMin" = 30,
     "sq2rad" = c((1 / 6) / 4, 0.1 / 4), # kvadráty KFME 2rad, xy velikost ve stupních
     "sq2radDist" = c(1:5),
-    "replicates" = 3,
+    "replicates" = 10,
     "speciesPart" = cmd_arg, "version" = "v1",
     "bgRaster" = FALSE,
     "versionNames" = vn, "versionSmooting" = vf
@@ -140,7 +140,7 @@ evalIndep <- function(m, lsd.temp) {
         #
 
         if (inherits(try({
-            ev <- sdm::evaluates(lsd.temp$presence, ex.predicted)
+            ev <- sdmATM::evaluates(lsd.temp$presence, ex.predicted)
         }), "try-error")) {
             ev <- NA
         }
@@ -150,10 +150,6 @@ evalIndep <- function(m, lsd.temp) {
         ev.temp <- as.data.frame(ev@statistics[-3])
         ev.temp <- merge(ev.temp, t(as.data.frame(ev@statistics$COR)))
         ev.temp <- merge(ev.temp, ev@threshold_based[1, ]) # sp=se
-        ev.temp <- as.data.frame(ev@statistics[-3])
-        ev.temp <- merge(ev.temp, t(as.data.frame(ev@statistics$COR)))
-        # max(se+sp)
-        ev.temp <- merge(ev.temp, ev@threshold_based[2, ])
         ev.temp[["tune.args"]] <- layer
         if (first) {
             first <- FALSE
@@ -206,27 +202,43 @@ que <- function(replicates, ndop.stat.res.sp.selected, path.tgob) {
         saveRDS(que, paste0(path.tgob, que.fn))
     }
 
-    if (nrow(que %>% filter(lock == 1)) > 0) {
-        print("čekání")
-        Sys.sleep(1)
-        que(replicates, ndop.stat.res.sp.selected, path.tgob)
+
+    locked <- nrow(que %>% filter(lock == 1))
+    que.r <- que %>%
+        filter(rep < replicates) %>%
+        arrange(POLE.n) %>%
+        slice_head(n = 1)
+
+
+    if (locked > 0) {
+        if (nrow(que.r) > 0) {
+            print("table locked, waiting...")
+            Sys.sleep(1)
+            que(replicates, ndop.stat.res.sp.selected, path.tgob)
+        } else {
+            print("no tasks in que, finised")
+            return(out)
+        }
     } else {
-        print("výběr")
+        print("selecting next combination of species & replication, lock and save table")
         que$lock <- 1
         saveRDS(que, paste0(path.tgob, que.fn))
 
-        que.r <- que %>%
-            filter(rep < replicates) %>%
-            arrange(POLE.n) %>%
-            slice_head(n = 1)
 
         if (nrow(que.r) > 0) {
-            print("update")
-            que <- dplyr::rows_update(que, que %>% filter(rep < replicates) %>% arrange(POLE.n) %>% slice_head(n = 1) %>% mutate(rep = rep + 1))
+            print("next combination of species & replication selected, unlock and save updated table, return species & replication")
+            que.sr <- que %>%
+                filter(rep < replicates) %>%
+                arrange(POLE.n) %>%
+                slice_head(n = 1) %>%
+                mutate(rep = rep + 1)
+            print(que.sr)
+            que <- dplyr::rows_update(que, que.sr)
             que$lock <- 0
             saveRDS(que, paste0(path.tgob, que.fn))
             return(list("species" = as.character(unname(unlist(que.r$DRUH))), "replicates" = as.numeric(unname(unlist(que.r$rep))) + 1))
         } else {
+            print("no rows to select")
             return(out)
         }
     }

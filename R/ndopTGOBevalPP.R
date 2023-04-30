@@ -1,7 +1,7 @@
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
-required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "geosphere", "ENMeval", "sdmATM", "ggplot2", "grid", "gridExtra") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
+required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "sdmATM", "ggplot2", "grid", "gridExtra") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
 
 install.packages(setdiff(required_packages, rownames(installed.packages())))
 
@@ -38,6 +38,7 @@ path.rgee <- paste0(path.wd, "../../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec20
 source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.lsd <- paste0(path.prep, "lsd/")
 path.eval <- paste0(path.prep, "ndopTGOBeval/")
+path.tgob <- paste0(path.prep, "ndopTGOB/")
 path.PP <- paste0(path.eval, "PP/")
 
 ############
@@ -85,7 +86,7 @@ if (file.exists(modelsResults)) {
   first <- TRUE
   for (rdsPath in rds_list) {
     bn <- basename(rdsPath)
-    r <- unlist(strsplit(unlist(strsplit(bn, "[.]"))[1], "_"))[5]
+    r <- unlist(strsplit(unlist(strsplit(bn, "[.]"))[1], "_"))[4]
 
     print(bn)
     print(r)
@@ -137,10 +138,10 @@ if (file.exists(modelsResults.avg)) {
 }
 # vu <- unique(tbl$version)
 
-selection <- c("TGOB", "TO", "TS", "ssos2TGOB", "ssos2TO", "ssos2TS", "un")
+selection <- c("ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "un")
 # selection.f <- c("ssos.topA100", "ssos.topS10", "tgob", "topA100", "topS10", "un", "ssos") # soos záměrně na konci
-selection.f2 <- c("TGOB", "TO", "TS", "ssos2TGOB", "ssos2TO", "ssos2TS", "un")
-selection.rename <- c("TGOB", "TO", "TS", "ssosTGOB", "ssosTO", "ssosTS", "thin")
+selection.f2 <- c("ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "un")
+selection.rename <- c("ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "thin")
 names(selection.rename) <- selection.f2
 
 ####
