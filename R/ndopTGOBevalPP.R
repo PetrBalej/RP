@@ -138,10 +138,15 @@ if (file.exists(modelsResults.avg)) {
 }
 # vu <- unique(tbl$version)
 
-selection <- c("ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "un")
+# tbl %<>% add_row(tbl_5)
+
+# saveRDS(tbl, paste0(path.eval, "tbl_5_6.rds"))
+# tbl <- readRDS(modelsResults.avg)
+
+selection <- c("ssosTSAO", "ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "TSAO", "un")
 # selection.f <- c("ssos.topA100", "ssos.topS10", "tgob", "topA100", "topS10", "un", "ssos") # soos záměrně na konci
-selection.f2 <- c("ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "un")
-selection.rename <- c("ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "thin")
+selection.f2 <- c("ssosTSAO", "ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "TSAO", "un")
+selection.rename <- c("ssosTSAO", "ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "TSAO", "thin")
 names(selection.rename) <- selection.f2
 
 ####
@@ -164,7 +169,7 @@ tbl.null.val <- tbl.null.ids %>%
   group_by(species) %>%
   slice_max(auc.val.avg, with_ties = FALSE) %>%
   dplyr::select(auc.val.avg, species, id) %>%
-  rename(auc.val_null = auc.val.avg) %>%
+  rename(auc.val.avg_null = auc.val.avg) %>%
   ungroup()
 
 ##########################
@@ -183,10 +188,12 @@ tbl.null.val <- tbl.null.ids %>%
 # připojím null (val+test) a spočtu diff
 tbl %<>% left_join(tbl.null.test, by = c("species"), suffix = c("", "__AUC")) %>%
   mutate(AUCdiff = AUC - AUC_null) %>%
+  mutate(AUCdiffNull = ifelse(AUC > AUC_null, AUC, AUC_null)) %>%
   group_by(species, version)
 
 tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg")) %>%
-  mutate(auc.valdiff = auc.val.avg - auc.val_null) %>%
+  mutate(auc.val.avgdiff = auc.val.avg - auc.val.avg_null) %>%
+  mutate(auc.val.avgdiffNull = ifelse(auc.val.avg > auc.val.avg_null, auc.val.avg, auc.val.avg_null)) %>%
   group_by(species, version)
 
 
@@ -224,22 +231,22 @@ for (at in ndop.fs$aucTresholds) {
   temp.null <- tbl.null %>%
     ungroup() %>%
     group_by(species) %>%
-    slice_max(auc.val_null, with_ties = FALSE)
+    slice_max(auc.val.avg_null, with_ties = FALSE)
   # null naive
-  summary_zasobnik[[as.character(at)]][["null.val"]] <- nrow(temp.null %>% filter(auc.val_null >= at))
+  summary_zasobnik[[as.character(at)]][["null.val"]] <- nrow(temp.null %>% filter(auc.val.avg_null >= at))
   # null naive true
-  summary_zasobnik[[as.character(at)]][["null.val.test"]] <- nrow(temp.null %>% filter(auc.val_null >= at) %>% filter(AUC_null >= at))
+  summary_zasobnik[[as.character(at)]][["null.val.test"]] <- nrow(temp.null %>% filter(auc.val.avg_null >= at) %>% filter(AUC_null >= at))
   # null true
   summary_zasobnik[[as.character(at)]][["null.test"]] <- nrow(temp.null %>% ungroup() %>% group_by(species) %>% slice_max(AUC_null, with_ties = FALSE) %>% filter(AUC_null >= at))
 
 
   #
-  # not null auc.valdiff
+  # not null auc.val.avgdiff
   #
   temp.nn <- tbl.nn %>%
     ungroup() %>%
     group_by(species) %>%
-    slice_max(auc.valdiff, with_ties = FALSE)
+    slice_max(auc.val.avgdiff, with_ties = FALSE)
   # val
   summary_zasobnik[[as.character(at)]][["kss.val"]] <- nrow(temp.nn %>% filter(auc.val.avg >= at))
 
@@ -255,7 +262,7 @@ for (at in ndop.fs$aucTresholds) {
   temp.nnNull <- tbl.f %>%
     ungroup() %>%
     group_by(species) %>%
-    slice_max(auc.valdiff, with_ties = FALSE)
+    slice_max(auc.val.avgdiff, with_ties = FALSE)
   # val
   summary_zasobnik[[as.character(at)]][["kssNull.val"]] <- nrow(temp.nnNull %>% filter(auc.val.avg >= at))
 
@@ -338,20 +345,20 @@ for (at in ndop.fs$aucTresholds) {
 
 
   ######################
-  # kss auc.valdiff
+  # kss auc.val.avgdiff
   ######################
 
 
   temp.g <- tbl.nn %>%
     ungroup() %>%
     group_by(species, version) %>%
-    slice_max(auc.valdiff, with_ties = FALSE) %>%
+    slice_max(auc.val.avgdiff, with_ties = FALSE) %>%
     filter(auc.val.avg >= at)
 
   temp.g.median <- temp.g %>%
     ungroup() %>%
     group_by(version) %>%
-    summarise(AUCdiffMedian = median(auc.valdiff), AUCdiffQ_025 = quantile(auc.valdiff, 0.25), AUCdiffQ_020 = quantile(auc.valdiff, 0.20), AUCdiffQ_010 = quantile(auc.valdiff, 0.10), AUCdiffQ_005 = quantile(auc.valdiff, 0.05)) %>%
+    summarise(AUCdiffMedian = median(auc.val.avgdiff), AUCdiffQ_025 = quantile(auc.val.avgdiff, 0.25), AUCdiffQ_020 = quantile(auc.val.avgdiff, 0.20), AUCdiffQ_010 = quantile(auc.val.avgdiff, 0.10), AUCdiffQ_005 = quantile(auc.val.avgdiff, 0.05)) %>%
     dplyr::select(AUCdiffMedian, AUCdiffQ_025, AUCdiffQ_020, AUCdiffQ_010, AUCdiffQ_005, version) %>%
     ungroup() %>%
     arrange(AUCdiffMedian)
@@ -367,7 +374,7 @@ for (at in ndop.fs$aucTresholds) {
 
 
   # a) vše
-  ggplot(temp.g %>% ungroup(), aes(x = version, y = auc.valdiff)) +
+  ggplot(temp.g %>% ungroup(), aes(x = version, y = auc.val.avgdiff)) +
     # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
     geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
     geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
@@ -382,7 +389,7 @@ for (at in ndop.fs$aucTresholds) {
 
 
   # a) vše
-  ggplot(temp.g %>% ungroup(), aes(occs.n, auc.valdiff)) +
+  ggplot(temp.g %>% ungroup(), aes(occs.n, auc.val.avgdiff)) +
     geom_point(aes(colour = factor(version)), size = 0.05) +
     geom_smooth(method = loess, size = 0.2) +
     theme_light() +
@@ -397,10 +404,10 @@ for (at in ndop.fs$aucTresholds) {
 
 
   # porovnání přispění verzí per species
-  title <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% mutate(title = paste0(species, "\n", round(auc.val_null, digits = 2), " -> ", round(auc.val.avg, digits = 2))) %>% dplyr::select(title)))
+  title <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% mutate(title = paste0(species, "\n", round(auc.val.avg_null, digits = 2), " -> ", round(auc.val.avg, digits = 2))) %>% dplyr::select(title)))
   names(title) <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% dplyr::select(species)))
 
-  ggplot(temp.g %>% ungroup(), aes(version, auc.valdiff)) +
+  ggplot(temp.g %>% ungroup(), aes(version, auc.val.avgdiff)) +
     geom_bar(stat = "identity", aes(fill = factor(version))) +
     theme_light() +
     theme(
@@ -425,9 +432,9 @@ for (at in ndop.fs$aucTresholds) {
     temp <- temp.g %>%
       filter(version %in% k) %>%
       group_by(species) %>%
-      slice_max(auc.valdiff, with_ties = FALSE) %>%
+      slice_max(auc.val.avgdiff, with_ties = FALSE) %>%
       ungroup() %>%
-      summarise(n = length(species), AUCdiffSum = sum(auc.valdiff), mean = mean(auc.valdiff), AUCdiffMedian = median(auc.valdiff), AUCdiffQ_025 = quantile(auc.valdiff, 0.25), AUCdiffQ_020 = quantile(auc.valdiff, 0.20), AUCdiffQ_010 = quantile(auc.valdiff, 0.10), AUCdiffQ_005 = quantile(auc.valdiff, 0.05))
+      summarise(n = length(species), AUCdiffSum = sum(auc.val.avgdiff), mean = mean(auc.val.avgdiff), AUCdiffMedian = median(auc.val.avgdiff), AUCdiffQ_025 = quantile(auc.val.avgdiff, 0.25), AUCdiffQ_020 = quantile(auc.val.avgdiff, 0.20), AUCdiffQ_010 = quantile(auc.val.avgdiff, 0.10), AUCdiffQ_005 = quantile(auc.val.avgdiff, 0.05))
     temp$versionComb <- paste(k, collapse = "|")
     temp$versionCount <- length(k)
     if (first) {
@@ -442,20 +449,20 @@ for (at in ndop.fs$aucTresholds) {
 
 
   ######################
-  # kss auc.valdiff test
+  # kss auc.val.avgdiff test
   ######################
 
   temp.g <- tbl.nn %>%
     ungroup() %>%
     group_by(species, version) %>%
-    slice_max(auc.valdiff, with_ties = FALSE) %>%
+    slice_max(auc.val.avgdiff, with_ties = FALSE) %>%
     filter(auc.val.avg >= at) %>%
     filter(AUC >= at)
 
   temp.g.median <- temp.g %>%
     ungroup() %>%
     group_by(version) %>%
-    summarise(AUCdiffMedian = median(auc.valdiff), AUCdiffQ_025 = quantile(auc.valdiff, 0.25), AUCdiffQ_020 = quantile(auc.valdiff, 0.20), AUCdiffQ_010 = quantile(auc.valdiff, 0.10), AUCdiffQ_005 = quantile(auc.valdiff, 0.05)) %>%
+    summarise(AUCdiffMedian = median(auc.val.avgdiff), AUCdiffQ_025 = quantile(auc.val.avgdiff, 0.25), AUCdiffQ_020 = quantile(auc.val.avgdiff, 0.20), AUCdiffQ_010 = quantile(auc.val.avgdiff, 0.10), AUCdiffQ_005 = quantile(auc.val.avgdiff, 0.05)) %>%
     dplyr::select(AUCdiffMedian, AUCdiffQ_025, AUCdiffQ_020, AUCdiffQ_010, AUCdiffQ_005, version) %>%
     ungroup() %>%
     arrange(AUCdiffMedian)
@@ -471,7 +478,7 @@ for (at in ndop.fs$aucTresholds) {
 
 
   # a) vše
-  ggplot(temp.g %>% ungroup(), aes(x = version, y = auc.valdiff)) +
+  ggplot(temp.g %>% ungroup(), aes(x = version, y = auc.val.avgdiff)) +
     # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
     geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
     geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
@@ -486,7 +493,7 @@ for (at in ndop.fs$aucTresholds) {
 
 
   # a) vše
-  ggplot(temp.g %>% ungroup(), aes(occs.n, auc.valdiff)) +
+  ggplot(temp.g %>% ungroup(), aes(occs.n, auc.val.avgdiff)) +
     geom_point(aes(colour = factor(version)), size = 0.05) +
     geom_smooth(method = loess, size = 0.2) +
     theme_light() +
@@ -499,10 +506,10 @@ for (at in ndop.fs$aucTresholds) {
   ggsave(paste0(path.PP, "trend.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # porovnání přispění verzí per species
-  title <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% mutate(title = paste0(species, "\n", round(auc.val_null, digits = 2), " -> ", round(auc.val.avg, digits = 2))) %>% dplyr::select(title)))
+  title <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% mutate(title = paste0(species, "\n", round(auc.val.avg_null, digits = 2), " -> ", round(auc.val.avg, digits = 2))) %>% dplyr::select(title)))
   names(title) <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% dplyr::select(species)))
 
-  ggplot(temp.g %>% ungroup(), aes(version, auc.valdiff)) +
+  ggplot(temp.g %>% ungroup(), aes(version, auc.val.avgdiff)) +
     geom_bar(stat = "identity", aes(fill = factor(version))) +
     theme_light() +
     theme(
@@ -527,9 +534,9 @@ for (at in ndop.fs$aucTresholds) {
     temp <- temp.g %>%
       filter(version %in% k) %>%
       group_by(species) %>%
-      slice_max(auc.valdiff, with_ties = FALSE) %>%
+      slice_max(auc.val.avgdiff, with_ties = FALSE) %>%
       ungroup() %>%
-      summarise(n = length(species), AUCdiffSum = sum(auc.valdiff), mean = mean(auc.valdiff), AUCdiffMedian = median(auc.valdiff), AUCdiffQ_025 = quantile(auc.valdiff, 0.25), AUCdiffQ_020 = quantile(auc.valdiff, 0.20), AUCdiffQ_010 = quantile(auc.valdiff, 0.10), AUCdiffQ_005 = quantile(auc.valdiff, 0.05))
+      summarise(n = length(species), AUCdiffSum = sum(auc.val.avgdiff), mean = mean(auc.val.avgdiff), AUCdiffMedian = median(auc.val.avgdiff), AUCdiffQ_025 = quantile(auc.val.avgdiff, 0.25), AUCdiffQ_020 = quantile(auc.val.avgdiff, 0.20), AUCdiffQ_010 = quantile(auc.val.avgdiff, 0.10), AUCdiffQ_005 = quantile(auc.val.avgdiff, 0.05))
     temp$versionComb <- paste(k, collapse = "|")
     temp$versionCount <- length(k)
     if (first) {
