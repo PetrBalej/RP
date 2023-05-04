@@ -56,7 +56,9 @@ ndop.fs <- list("aucTresholds" = c(0.00, 0.70), "version" = "v1")
 ############
 # execution
 ############
-dir.create(path.PP, showWarnings = FALSE)
+
+# select null if performs better
+withNull <- FALSE
 
 #
 # pokud je nějaká metoda korelovaná s LSD AUC, tak to znamená, že asi opravdu funguje korekce biasu? ne, jen že se lze spolehnout na výsledky auc.var.avg
@@ -185,17 +187,30 @@ tbl.null.val <- tbl.null.ids %>%
 ##### Zohlednit! Stejně tak i udělat hranici 0.75 - dofiltrovat, neúspěšné druhy mě také nezajímají!!!
 #####
 
-# připojím null (val+test) a spočtu diff
-tbl %<>% left_join(tbl.null.test, by = c("species"), suffix = c("", "__AUC")) %>%
-  mutate(AUCdiff = AUC - AUC_null) %>%
-  mutate(AUCdiffNull = ifelse(AUC > AUC_null, AUC, AUC_null)) %>%
-  group_by(species, version)
+if (withNull) {
+  # nepočítám negativní diff, nechávam 0 rozdíl
+  # připojím null (val+test) a spočtu diff
+  tbl %<>% left_join(tbl.null.test, by = c("species"), suffix = c("", "__AUC")) %>%
+    mutate(AUCdiff = ifelse(AUC > AUC_null, AUC - AUC_null, 0)) %>%
+    group_by(species, version)
 
-tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg")) %>%
-  mutate(auc.val.avgdiff = auc.val.avg - auc.val.avg_null) %>%
-  mutate(auc.val.avgdiffNull = ifelse(auc.val.avg > auc.val.avg_null, auc.val.avg, auc.val.avg_null)) %>%
-  group_by(species, version)
+  tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg")) %>%
+    mutate(auc.val.avgdiff = ifelse(auc.val.avg > auc.val.avg_null, auc.val.avg - auc.val.avg_null, 0)) %>%
+    group_by(species, version)
 
+  path.PP <- gsub("/$", "_withNull/", path.PP)
+} else {
+  # připojím null (val+test) a spočtu diff
+  tbl %<>% left_join(tbl.null.test, by = c("species"), suffix = c("", "__AUC")) %>%
+    mutate(AUCdiff = AUC - AUC_null) %>%
+    group_by(species, version)
+
+  tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg")) %>%
+    mutate(auc.val.avgdiff = auc.val.avg - auc.val.avg_null) %>%
+    group_by(species, version)
+}
+
+dir.create(path.PP, showWarnings = FALSE)
 
 #
 # porovnání počtu druhů průchozích přes treshold
