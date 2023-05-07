@@ -59,6 +59,8 @@ ndop.fs <- list("aucTresholds" = c(0.00, 0.70), "version" = "v1")
 
 # select null if performs better
 withNull <- FALSE
+# remove thin to get only TGOB derived versions
+withThin <- FALSE
 
 #
 # pokud je nějaká metoda korelovaná s LSD AUC, tak to znamená, že asi opravdu funguje korekce biasu? ne, jen že se lze spolehnout na výsledky auc.var.avg
@@ -269,6 +271,15 @@ if (withNull) {
   tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg")) %>%
     mutate(auc.val.avgdiff = auc.val.avg - auc.val.avg_null) %>%
     group_by(species, version)
+}
+
+if (!withThin) {
+  # odstranit tinning z výsledků - čisté přispění TGOB verzí
+  last <- length(selection)
+  selection <- selection[-last]
+  selection.f2 <- selection.f2[-last]
+  selection.rename <- selection.rename[-last]
+  path.PP <- gsub("/$", "_withoutThin/", path.PP)
 }
 
 dir.create(path.PP, showWarnings = FALSE)
