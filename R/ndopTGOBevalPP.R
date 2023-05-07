@@ -471,7 +471,7 @@ for (at in ndop.fs$aucTresholds) {
 
   tobs <- ggplot() +
     geom_bar(data = temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avgdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, auc.val.avgdiff, fill = factor(version)), color = "yellow", size = 0.01) +
-    geom_point(data = temp.g %>% ungroup(), mapping = aes(species, auc.val.avgdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21) +
+    geom_point(data = temp.g %>% ungroup(), mapping = aes(species, auc.val.avgdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21, alpha = 0.90) +
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
     theme_light() +
     theme(
@@ -553,7 +553,7 @@ for (at in ndop.fs$aucTresholds) {
 
     tobs <- ggplot() +
       geom_bar(data = temp.g.c %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avgdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, auc.val.avgdiff, fill = factor(version)), color = "yellow", size = 0.01) +
-      geom_point(data = temp.g.c %>% ungroup(), mapping = aes(species, auc.val.avgdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21) +
+      geom_point(data = temp.g.c %>% ungroup(), mapping = aes(species, auc.val.avgdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21, alpha = 0.90) +
       scale_fill_manual(values = unique(unname(unlist(temp.g.c %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
       theme_light() +
       theme(
@@ -888,7 +888,7 @@ for (at in ndop.fs$aucTresholds) {
 
   tobs <- ggplot() +
     geom_bar(data = temp.g %>% ungroup() %>% group_by(species) %>% slice_max(AUCdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, AUCdiff, fill = factor(version)), color = "yellow", size = 0.01) +
-    geom_point(data = temp.g %>% ungroup(), mapping = aes(species, AUCdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21) +
+    geom_point(data = temp.g %>% ungroup(), mapping = aes(species, AUCdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21, alpha = 0.90) +
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
     theme_light() +
     theme(
@@ -970,7 +970,7 @@ for (at in ndop.fs$aucTresholds) {
 
     tobs <- ggplot() +
       geom_bar(data = temp.g.c %>% ungroup() %>% group_by(species) %>% slice_max(AUCdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, AUCdiff, fill = factor(version)), color = "yellow", size = 0.01) +
-      geom_point(data = temp.g.c %>% ungroup(), mapping = aes(species, AUCdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21) +
+      geom_point(data = temp.g.c %>% ungroup(), mapping = aes(species, AUCdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21, alpha = 0.90) +
       scale_fill_manual(values = unique(unname(unlist(temp.g.c %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
       theme_light() +
       theme(
