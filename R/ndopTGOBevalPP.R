@@ -167,12 +167,19 @@ selection.f2 <- c(
   "TS", "ssosTS",
   "un"
 )
+# selection.rename <- c(
+#   "TGOB", "ssoTGOB",
+#   "TSAO", "ssoTSAO",
+#   "TO", "ssoTO",
+#   "TS", "ssoTS",
+#   "thin"
+# )
 selection.rename <- c(
-  "TGOB", "ssoTGOB",
-  "TSAO", "ssoTSAO",
-  "TO", "ssoTO",
-  "TS", "ssoTS",
-  "thin"
+  "TGOB", "TGOBsso",
+  "TSAO", "TSAOsso",
+  "TO", "TOsso",
+  "TS", "TS.sso", # tečka dočasně kvůli řazení v legendě
+  ".thin" # tečka dočasně kvůli řazení v legendě
 )
 selection.f2 <- paste0("^", selection.f2, "$")
 
