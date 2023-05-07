@@ -1188,7 +1188,32 @@ write.csv(summary_zasobnik.t, paste0(path.PP, "version-species-treshold-count.cs
 
 saveRDS(zasobnik0, paste0(path.PP, "version-species-treshold-count.rds"))
 
+#
+# souhrny
+#
 
+pairs.main <- names(pairs.compare)
+pairs.sso <- sapply(pairs.compare, function(x) paste(x, collapse = "|"))
+
+for (v in c("val", "test")) {
+  # párový přínost sso verzí
+  combs.select <- c(pairs.main, pairs.sso)
+  combs.select.res <- combs[["0"]][[v]] %>%
+    filter(versionComb %in% combs.select) %>%
+    arrange(versionComb) %>%
+    dplyr::select(AUCdiffSum, mean, AUCdiffMedian, versionComb)
+  # manual reorder
+  combs.select.res <- combs.select.res[c(1:5, 8, 4, 7), ]
+  write.csv(combs.select.res, paste0(path.PP, "pair-sso-version-cumsum.", v, ".csv"), row.names = FALSE)
+
+  # TGOB + další řádné + sso
+  tgob.main.res <- combs[["0"]][[v]] %>%
+    filter(versionComb %in% c(pairs.main[1], paste(pairs.main, collapse = "|"))) %>%
+    arrange(versionComb) %>%
+    dplyr::select(AUCdiffSum, mean, AUCdiffMedian, versionComb)
+  tgob.main.res %<>% add_row(combs[["0"]][[v]] %>% slice_head(n = 1) %>% dplyr::select(AUCdiffSum, mean, AUCdiffMedian, versionComb))
+  write.csv(tgob.main.res, paste0(path.PP, "main-sso-version-cumsum.", v, ".csv"), row.names = FALSE)
+}
 
 
 # stop()
