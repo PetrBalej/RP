@@ -624,12 +624,13 @@ for (at in ndop.fs$aucTresholds) {
 
 
   # a) vše
-  ggplot(temp.g %>% ungroup(), aes(x = version, y = auc.val.avgdiff)) +
+  ggplot(temp.g %>% ungroup(), aes(x = version, y = auc.val.avgdiff, fill = clr)) +
     # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
     geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-    geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
-    geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
+    geom_point(aes(y = AUCdiffQ_010), size = 1, shape = 3, stroke = 0.01) +
+    geom_point(aes(y = AUCdiffQ_005), size = 1, shape = 4, stroke = 0.01) +
     theme_light() +
+    scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
       legend.position = "none", text = element_text(size = 4),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
@@ -697,12 +698,13 @@ for (at in ndop.fs$aucTresholds) {
 
 
   # a) vše
-  ggplot(temp.g %>% ungroup(), aes(x = version, y = auc.val.avgdiff)) +
+  ggplot(temp.g %>% ungroup(), aes(x = version, y = auc.val.avgdiff, fill = clr)) +
     # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
     geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-    geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
-    geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
+    geom_point(aes(y = AUCdiffQ_010), size = 1, shape = 3, stroke = 0.01) +
+    geom_point(aes(y = AUCdiffQ_005), size = 1, shape = 4, stroke = 0.01) +
     theme_light() +
+    scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
       legend.position = "none", text = element_text(size = 4),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
@@ -955,12 +957,13 @@ for (at in ndop.fs$aucTresholds) {
 
 
   # a) vše
-  ggplot(temp.g %>% ungroup(), aes(x = version, y = AUCdiff)) +
+  ggplot(temp.g %>% ungroup(), aes(x = version, y = AUCdiff, fill = clr)) +
     # stat_summary(fun.data=boxplotCustom, geom="boxplot", lwd=0.1,notch=TRUE)  +
     geom_boxplot(size = 0.1, notch = TRUE, outlier.size = 0.1, outlier.stroke = 0.3) +
-    geom_point(aes(y = AUCdiffQ_010), size = 0.2, color = "red", shape = 18) +
-    geom_point(aes(y = AUCdiffQ_005), size = 0.2, color = "green", shape = 18) +
+    geom_point(aes(y = AUCdiffQ_010), size = 1, shape = 3, stroke = 0.01) +
+    geom_point(aes(y = AUCdiffQ_005), size = 1, shape = 4, stroke = 0.01) +
     theme_light() +
+    scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
       legend.position = "none", text = element_text(size = 4),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
