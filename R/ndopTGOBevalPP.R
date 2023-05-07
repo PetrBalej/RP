@@ -186,6 +186,11 @@ selection.f2 <- paste0("^", selection.f2, "$")
 
 names(selection.rename) <- selection.f2
 
+pairs.compare <- list()
+pairs.compare[[selection.rename[1]]] <- selection.rename[1:2]
+pairs.compare[[selection.rename[3]]] <- selection.rename[3:4]
+pairs.compare[[selection.rename[5]]] <- selection.rename[5:6]
+pairs.compare[[selection.rename[7]]] <- selection.rename[7:8]
 
 
 # # friendly
@@ -534,6 +539,89 @@ for (at in ndop.fs$aucTresholds) {
 
   ### ### ### endB
 
+  #
+  # páry
+  #
+  for (cmp in pairs.compare) {
+    temp.g.c <- temp.g
+
+
+    temp.g.c %<>% filter(version %in% cmp)
+    ### ### ###
+    ### ### ### startA val
+    ### ### ###
+
+    tobs <- ggplot() +
+      geom_bar(data = temp.g.c %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avgdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, auc.val.avgdiff, fill = factor(version)), color = "yellow", size = 0.01) +
+      geom_point(data = temp.g.c %>% ungroup(), mapping = aes(species, auc.val.avgdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21) +
+      scale_fill_manual(values = unique(unname(unlist(temp.g.c %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
+      theme_light() +
+      theme(
+        text = element_text(size = 6),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
+        panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+        strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
+      )
+
+    # základní + změna řazení
+    no <- temp.g.c %>%
+      ungroup() %>%
+      group_by(species) %>%
+      slice_max(auc.val.avgdiff, with_ties = FALSE) %>%
+      ungroup() %>%
+      mutate(title = paste0(species, " (", round(auc.val.avg_null, digits = 2), "->", round(auc.val.avg, digits = 2), ")")) %>%
+      dplyr::select(title, occs.n, species, auc.val.avgdiff, auc.val.avg, auc.val.avg_null)
+
+    title <- unname(unlist(no$title))
+    title.occs.n <- paste0(title, " | ", unname(unlist(no$occs.n)))
+
+    tobs + scale_x_discrete(labels = title.occs.n) + xlab("species (ordered by: alphabet)")
+    ggsave(paste0(path.PP, "trend-overall-best-species.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 1500, units = "px")
+
+
+    # occs.n
+    no.temp <- no %>%
+      arrange(occs.n)
+    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+    title <- unname(unlist(no.temp$title))
+    title.occs.n <- paste0(title, " | ", unname(unlist(no.temp$occs.n)))
+
+    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares)")
+    ggsave(paste0(path.PP, "trend-overall-best-species-orderByOccs.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 1500, units = "px")
+
+    # auc.val.avgdiff
+    no.temp <- no %>%
+      arrange(auc.val.avgdiff)
+    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+    title <- unname(unlist(no.temp$title))
+    title.occs.n <- paste0(title, " | ", unname(unlist(no.temp$occs.n)))
+
+    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avgdiff)")
+    ggsave(paste0(path.PP, "trend-overall-best-species-orderByDiff.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 1500, units = "px")
+
+    # auc.val.avg
+    no.temp <- no %>%
+      arrange(auc.val.avg)
+    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+    title <- unname(unlist(no.temp$title))
+    title.occs.n <- paste0(title, " | ", unname(unlist(no.temp$occs.n)))
+
+    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg)")
+    ggsave(paste0(path.PP, "trend-overall-best-species-orderByAuc.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 1500, units = "px")
+
+    # auc.val.avg_null
+    no.temp <- no %>%
+      arrange(auc.val.avg_null)
+    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+    title <- unname(unlist(no.temp$title))
+    title.occs.n <- paste0(title, " | ", unname(unlist(no.temp$occs.n)))
+
+    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg_null)")
+    ggsave(paste0(path.PP, "trend-overall-best-species-orderByAucNull.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 1500, units = "px")
+
+    ### ### ### endB
+  }
+
 
   # a) vše
   ggplot(temp.g %>% ungroup(), aes(occs.n, auc.val.avgdiff)) +
@@ -867,9 +955,88 @@ for (at in ndop.fs$aucTresholds) {
 
   ### ### ### endB
 
+  #
+  # páry
+  #
+  for (cmp in pairs.compare) {
+    temp.g.c <- temp.g
 
 
+    temp.g.c %<>% filter(version %in% cmp)
 
+    ### ### ###
+    ### ### ### startA TEST
+    ### ### ###
+
+    tobs <- ggplot() +
+      geom_bar(data = temp.g.c %>% ungroup() %>% group_by(species) %>% slice_max(AUCdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, AUCdiff, fill = factor(version)), color = "yellow", size = 0.01) +
+      geom_point(data = temp.g.c %>% ungroup(), mapping = aes(species, AUCdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21) +
+      scale_fill_manual(values = unique(unname(unlist(temp.g.c %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
+      theme_light() +
+      theme(
+        text = element_text(size = 6),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
+        panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+        strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
+      )
+
+    # základní + změna řazení
+    no <- temp.g.c %>%
+      ungroup() %>%
+      group_by(species) %>%
+      slice_max(AUCdiff, with_ties = FALSE) %>%
+      ungroup() %>%
+      mutate(title = paste0(species, " (", round(AUC_null, digits = 2), "->", round(AUC, digits = 2), ")")) %>%
+      dplyr::select(title, occs.n, species, AUCdiff, AUC, AUC_null)
+
+    title <- unname(unlist(no$title))
+    title.occs.n <- paste0(title, " | ", unname(unlist(no$occs.n)))
+
+    tobs + scale_x_discrete(labels = title.occs.n) + xlab("species (ordered by: alphabet)")
+    ggsave(paste0(path.PP, "trend-overall-best-species.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 1500, units = "px")
+
+    # occs.n
+    no.temp <- no %>%
+      arrange(occs.n)
+    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+    title <- unname(unlist(no.temp$title))
+    title.occs.n <- paste0(title, " | ", unname(unlist(no.temp$occs.n)))
+
+    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares)")
+    ggsave(paste0(path.PP, "trend-overall-best-species-orderByOccs.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 1500, units = "px")
+
+    # AUCdiff
+    no.temp <- no %>%
+      arrange(AUCdiff)
+    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+    title <- unname(unlist(no.temp$title))
+    title.occs.n <- paste0(title, " | ", unname(unlist(no.temp$occs.n)))
+
+    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUCdiff)")
+    ggsave(paste0(path.PP, "trend-overall-best-species-orderByDiff.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 1500, units = "px")
+
+    # AUC
+    no.temp <- no %>%
+      arrange(AUC)
+    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+    title <- unname(unlist(no.temp$title))
+    title.occs.n <- paste0(title, " | ", unname(unlist(no.temp$occs.n)))
+
+    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC)")
+    ggsave(paste0(path.PP, "trend-overall-best-species-orderByAuc.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 1500, units = "px")
+
+    # AUC_null
+    no.temp <- no %>%
+      arrange(AUC_null)
+    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+    title <- unname(unlist(no.temp$title))
+    title.occs.n <- paste0(title, " | ", unname(unlist(no.temp$occs.n)))
+
+    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC_null)")
+    ggsave(paste0(path.PP, "trend-overall-best-species-orderByAucNull.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 1500, units = "px")
+
+    ### ### ### endB
+  }
 
 
   # a) vše
