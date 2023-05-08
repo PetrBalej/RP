@@ -75,7 +75,7 @@ withThin <- FALSE
 modelsResults <- paste0(path.eval, "tbl.rep.rds")
 if (file.exists(modelsResults)) {
   print("načítám existující tbl.rep")
-  tbl <- readRDS(modelsResults)
+  tbl <- tbl.rep <- readRDS(modelsResults)
 } else {
   print("generuju výsledky")
   # pro znovu vygenerování
@@ -105,7 +105,7 @@ if (file.exists(modelsResults)) {
     }
   }
 
-  tbl <- as_tibble(out) %>% na.omit()
+  tbl <- tbl.rep <- as_tibble(out) %>% na.omit()
   saveRDS(tbl, paste0(path.eval, "tbl.rep.rds"))
 }
 
@@ -217,8 +217,6 @@ names(selection.colors) <- paste0("^", selection.rename, "$")
 
 
 ####
-# tbl %<>% filter(version %in% selection)
-
 # random (null) verze k porovnání
 tbl.null.ids <- tbl %>% filter(version == "un" & adjust == "0")
 
@@ -249,18 +247,6 @@ tbl.occs.n <- tbl %>%
 tbl %<>% rename(occs.n.orig = occs.n)
 tbl %<>% left_join(tbl.occs.n, by = c("species"))
 
-##########################
-#
-# musím odlišit/vyčlenit thinningy (zbývající UN)´- ze summary_zasobnik
-# kde vyfiltrovat 0.70 AUC? nebo auc.val.avg?
-#
-#######################
-
-
-#####
-##### pozor, záleží i na tom, jestli je zhoršení z 90 na 80 nebo z 60 na 50!! Nebo zlepšení z 50 na 60 mě taky nemusí zajímat, a z 80 na 90 také ne...
-##### Zohlednit! Stejně tak i udělat hranici 0.75 - dofiltrovat, neúspěšné druhy mě také nezajímají!!!
-#####
 
 if (withNull) {
   # nepočítám negativní diff, nechávam 0 rozdíl
@@ -383,10 +369,8 @@ for (at in ndop.fs$aucTresholds) {
 
 
   # jsou auc.test.avg a AUC u zvolených metod korelované? - až nad filtrovaným datasetem: AUC?
-  # měl bych ale spočíst i omision rate nad LSD - tam by měl být smysluplný?
-
+  # měl bych ale spočíst i omision rate nad LSD - tam by měl být smysluplný? + UPR+OPR
   # korelovanost výsledků auc AUC v rámci metod
-  # zjistit jakou korelovsanost vykazuje výsledné spojení všech verzí!!!!!!!!!!!!!!!!!!!!!!
 
   zasobnik <- list()
   for (ver in unique(tbl.nn$version)) {
