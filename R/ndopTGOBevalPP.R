@@ -62,6 +62,18 @@ withNull <- FALSE
 # remove thin to get only TGOB derived versions
 withThin <- FALSE
 
+# generování ověření rozdílnosti verzí t.test-em (trvá extrémně dlouho, kešuju)
+verified.generate <- FALSE
+verified.top2 <- "verified.top2.rds"
+verified.top1null <- "verified.top1null.rds"
+
+if (file.exists(paste0(path.eval, verified.top2)) & file.exists(paste0(path.eval, verified.top1null))) {
+  tmp.top2 <- readRDS(paste0(path.eval, verified.top2))
+  tmp.top1null <- readRDS(paste0(path.eval, verified.top1null))
+} else {
+  verified.generate <- TRUE
+}
+
 #
 # pokud je nějaká metoda korelovaná s LSD AUC, tak to znamená, že asi opravdu funguje korekce biasu? ne, jen že se lze spolehnout na výsledky auc.var.avg
 #
@@ -214,7 +226,14 @@ selection.colors <- c(
 # selection.colors <- paste0("#", selection.colors)
 names(selection.colors) <- paste0("^", selection.rename, "$")
 
+#
+# dřívější verze s replikacemi pro t.test-y (rozdíl dvou nej verzí), neřeším null?
+#
 
+tbl.rep %<>% ungroup() %>% mutate(id = row_number())
+
+tbl.rep.null.ids <- tbl.rep %>% filter(version == "un" & adjust == "0")
+tbl.rep.null.ids.unique <- unique(tbl.rep.null.ids$id)
 
 ####
 # random (null) verze k porovnání
@@ -271,6 +290,17 @@ if (withNull) {
     group_by(species, version)
 }
 
+
+# sjednotit i tabulku s replikacemi - nutné ještě před withThin!!!
+tbl.rep.f <- tbl.rep %>%
+  filter(version %in% selection) %>%
+  ungroup() %>%
+  mutate(version = str_replace_all(version, selection.rename)) %>%
+  group_by(species, version) # final versions selection
+
+tbl.rep.nn <- tbl.rep.f %>% filter(id %notin% tbl.rep.null.ids.unique) # not null
+tbl.rep.null <- tbl.rep %>% filter(id %in% tbl.rep.null.ids.unique) # null - musím brát z původní tabulky vždy - ikdyž počítám s !withThin
+
 if (!withThin) {
   # odstranit tinning z výsledků - čisté přispění TGOB verzí
   last <- length(selection)
@@ -303,7 +333,7 @@ selection.f2 <- selection.rename
 k6 <- comb_all(selection.f2, length(selection.f2))
 
 tbl.nn <- tbl.f %>% filter(id %notin% tbl.null.ids.unique) # not null
-tbl.null <- tbl.f %>% filter(id %in% tbl.null.ids.unique) # null
+tbl.null <- tbl %>% filter(id %in% tbl.null.ids.unique) # null - musím brát z původní tabulky vždy - ikdyž počítám s !withThin
 
 for (at in ndop.fs$aucTresholds) {
   print(at)
@@ -449,6 +479,128 @@ for (at in ndop.fs$aucTresholds) {
 
   temp.g %<>% left_join(temp.g.median, by = "version")
 
+
+  if (at == 0 & verified.generate) {
+    tmp.top2 <- list()
+    tmp.top1null <- list()
+    ### # + liší nejlepší od null? - nakonec to tam také budu potřebovat...
+    # udělat zároveň - odebírat null idečka až tady? - jak se to zachová, když budu počítat s null verzí? - tu nedělat?
+    # - nepočítat pokud je výsledek verze minusový, pak se mohou lišit, ale je to k ničemu...
+
+    # musí jít spočíst jednou na začátku a pak už jen uložené využívat?? Cachovat...
+
+    # přidat do výstupů vítěznou verzi a p-value
+
+    # sum(unlist(tmp.top2[["test"]]), na.rm=TRUE)
+    # sum(unlist(tmp.top1null[["test"]]), na.rm=TRUE)
+
+    # tmp.top2.t <- t(as_tibble(tmp.top2))
+    # rn <- row.names(tmp.top2.t)
+    # cn <- names(tmp.top2[[1]])
+    # tmp.top2.t <- as.data.frame(tmp.top2.t)
+    # tmp.top2.t <- as_tibble(sapply(tmp.top2.t, as.numeric))
+    # row.names(tmp.top2.t) <- rn
+    # tmp.top2.t <- t(tmp.top2.t)
+    # tmp.top2.t <- as_tibble(tmp.top2.t)
+    # tmp.top2.t$species <- cn
+
+
+    print("liší se výsledné AUC nejlepších dvou verzí (porovnává všechny replikace)? (další metriky???)  [auc.val.avg]")
+    tmptbl <- temp.g %>%
+      group_by(species) %>%
+      arrange(desc(auc.val.avgdiff)) %>%
+      slice_head(n = 2) %>%
+      dplyr::select(species, version, adjust, tune.args)
+
+    tmptbl.null <- tbl.null %>%
+      group_by(species) %>%
+      arrange(desc(auc.val.avgdiff)) %>%
+      slice_head(n = 1) %>%
+      dplyr::select(species, version, adjust, tune.args)
+
+
+    for (sp in unique(tmptbl$species)) {
+      print("")
+      print(sp)
+
+      #
+      # top2
+      #
+      print("top2:")
+      top2 <- tmptbl %>% filter(species == sp)
+
+      top2v <- lapply(1:2, function(x) {
+        tmp <- list()
+        tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
+        tmp[["top"]] <- top2[x, ]$version
+
+        # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
+        # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if (nrow(tmp[["t"]]) >= 3) {
+          tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$auc.val.avg)$p.value
+        } else {
+          print(" < 3 replikací !!!")
+          tmp[["shapiro.p"]] <- 0
+        }
+        return(tmp)
+      })
+
+      top2v.normality <- sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
+
+      # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
+      # vartest <- var.test(top2v[[1]][["t"]]$auc.val.avg, top2v[[2]][["t"]]$auc.val.avg)   # p < 0.05 (Variances are not equal)
+      if (top2v.normality) {
+        print("OK (normality)")
+        ttest <- t.test(top2v[[1]][["t"]]$auc.val.avg, top2v[[2]][["t"]]$auc.val.avg, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+        tmp.top2[["all"]][[sp]][["val"]] <- ttest$p.value
+        tmp.top2[["all"]][[sp]][["val.auc1"]] <- mean(top2v[[1]][["t"]]$auc.val.avg)
+        tmp.top2[["all"]][[sp]][["val.auc2"]] <- mean(top2v[[2]][["t"]]$auc.val.avg)
+        tmp.top2[["all"]][[sp]][["val.version1"]] <- top2v[[1]][["top"]]
+        tmp.top2[["all"]][[sp]][["val.version2"]] <- top2v[[2]][["top"]]
+      } else {
+        print("auc nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+        tmp.top2[["all"]][[sp]][["val"]] <- NA
+        tmp.top2[["all"]][[sp]][["val.auc1"]] <- NA
+        tmp.top2[["all"]][[sp]][["val.auc2"]] <- NA
+        tmp.top2[["all"]][[sp]][["val.version1"]] <- NA
+        tmp.top2[["all"]][[sp]][["val.version2"]] <- NA
+      }
+
+      #
+      # top1 vs null
+      #
+      print("top1null:")
+      top1null <- tmptbl.null %>% filter(species == sp)
+
+      tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
+
+      if (nrow(tmp.null.t) >= 3) {
+        tmp.null <- shapiro.test(tmp.null.t$auc.val.avg)$p.value
+      } else {
+        print("null < 3 replikací !!!")
+        tmp.null <- 0
+      }
+
+      top1null.normality <- sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
+
+      if (top1null.normality) {
+        print("OK (normality)")
+        ttest <- t.test(top2v[[1]][["t"]]$auc.val.avg, tmp.null.t$auc.val.avg, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+        tmp.top1null[["all"]][[sp]][["val"]] <- ttest$p.value
+        tmp.top1null[["all"]][[sp]][["val.auc1"]] <- mean(top2v[[1]][["t"]]$auc.val.avg)
+        tmp.top1null[["all"]][[sp]][["val.auc2"]] <- mean(tmp.null.t$auc.val.avg)
+        tmp.top1null[["all"]][[sp]][["val.version1"]] <- top2v[[1]][["top"]]
+        tmp.top1null[["all"]][[sp]][["val.version2"]] <- "un"
+      } else {
+        print("auc (null a 1) nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+        tmp.top1null[["all"]][[sp]][["val"]] <- NA
+        tmp.top1null[["all"]][[sp]][["val.auc1"]] <- NA
+        tmp.top1null[["all"]][[sp]][["val.auc2"]] <- NA
+        tmp.top1null[["all"]][[sp]][["val.version1"]] <- NA
+        tmp.top1null[["all"]][[sp]][["val.version2"]] <- NA
+      }
+    }
+  }
   ### ### ###
   ### ### ### startA val
   ### ### ###
@@ -531,6 +683,106 @@ for (at in ndop.fs$aucTresholds) {
 
 
     temp.g.c %<>% filter(version %in% cmp)
+
+    if (at == 0 & verified.generate) {
+      print("liší se výsledné AUC párů verzí (porovnává všechny replikace)? (další metriky???)  [auc.val.avg]")
+      print(cmp[1])
+      tmptbl <- temp.g.c %>%
+        group_by(species) %>%
+        arrange(desc(auc.val.avgdiff)) %>%
+        slice_head(n = 2) %>%
+        dplyr::select(species, version, adjust, tune.args)
+
+      tmptbl.null <- tbl.null %>%
+        group_by(species) %>%
+        arrange(desc(auc.val.avgdiff)) %>%
+        slice_head(n = 1) %>%
+        dplyr::select(species, version, adjust, tune.args)
+
+
+      for (sp in unique(tmptbl$species)) {
+        print("")
+        print(sp)
+
+        #
+        # top2
+        #
+        print("top2:")
+        top2 <- tmptbl %>% filter(species == sp)
+
+        top2v <- lapply(1:2, function(x) {
+          tmp <- list()
+          tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
+          tmp[["top"]] <- top2[x, ]$version
+
+          # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
+          # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          if (nrow(tmp[["t"]]) >= 3) {
+            tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$auc.val.avg)$p.value
+          } else {
+            print(" < 3 replikací !!!")
+            tmp[["shapiro.p"]] <- 0
+          }
+          return(tmp)
+        })
+
+        top2v.normality <- sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
+
+        # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
+        # vartest <- var.test(top2v[[1]][["t"]]$auc.val.avg, top2v[[2]][["t"]]$auc.val.avg)   # p < 0.05 (Variances are not equal)
+        if (top2v.normality) {
+          print("OK (normality)")
+          ttest <- t.test(top2v[[1]][["t"]]$auc.val.avg, top2v[[2]][["t"]]$auc.val.avg, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+          tmp.top2[[cmp[1]]][[sp]][["val"]] <- ttest$p.value
+          tmp.top2[[cmp[1]]][[sp]][["val.auc1"]] <- mean(top2v[[1]][["t"]]$auc.val.avg)
+          tmp.top2[[cmp[1]]][[sp]][["val.auc2"]] <- mean(top2v[[2]][["t"]]$auc.val.avg)
+          tmp.top2[[cmp[1]]][[sp]][["val.version1"]] <- top2v[[1]][["top"]]
+          tmp.top2[[cmp[1]]][[sp]][["val.version2"]] <- top2v[[2]][["top"]]
+        } else {
+          print("auc nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+          tmp.top2[[cmp[1]]][[sp]][["val"]] <- NA
+          tmp.top2[[cmp[1]]][[sp]][["val.auc1"]] <- NA
+          tmp.top2[[cmp[1]]][[sp]][["val.auc2"]] <- NA
+          tmp.top2[[cmp[1]]][[sp]][["val.version1"]] <- NA
+          tmp.top2[[cmp[1]]][[sp]][["val.version2"]] <- NA
+        }
+
+        #
+        # top1 vs null
+        #
+        print("top1null:")
+        top1null <- tmptbl.null %>% filter(species == sp)
+
+        tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
+
+        if (nrow(tmp.null.t) >= 3) {
+          tmp.null <- shapiro.test(tmp.null.t$auc.val.avg)$p.value
+        } else {
+          print("null < 3 replikací !!!")
+          tmp.null <- 0
+        }
+
+        top1null.normality <- sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
+
+        if (top1null.normality) {
+          print("OK (normality)")
+          ttest <- t.test(top2v[[1]][["t"]]$auc.val.avg, tmp.null.t$auc.val.avg, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+          tmp.top1null[[cmp[1]]][[sp]][["val"]] <- ttest$p.value
+          tmp.top1null[[cmp[1]]][[sp]][["val.auc1"]] <- mean(top2v[[1]][["t"]]$auc.val.avg)
+          tmp.top1null[[cmp[1]]][[sp]][["val.auc2"]] <- mean(tmp.null.t$auc.val.avg)
+          tmp.top1null[[cmp[1]]][[sp]][["val.version1"]] <- top2v[[1]][["top"]]
+          tmp.top1null[[cmp[1]]][[sp]][["val.version2"]] <- "un"
+        } else {
+          print("auc (null a 1) nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+          tmp.top1null[[cmp[1]]][[sp]][["val"]] <- NA
+          tmp.top1null[[cmp[1]]][[sp]][["val.auc1"]] <- NA
+          tmp.top1null[[cmp[1]]][[sp]][["val.auc2"]] <- NA
+          tmp.top1null[[cmp[1]]][[sp]][["val.version1"]] <- NA
+          tmp.top1null[[cmp[1]]][[sp]][["val.version2"]] <- NA
+        }
+      }
+    }
+
     ### ### ###
     ### ### ### startA val
     ### ### ###
@@ -866,6 +1118,104 @@ for (at in ndop.fs$aucTresholds) {
   temp.g %<>% left_join(temp.g.median, by = "version")
 
 
+  if (at == 0 & verified.generate) {
+    print("liší se výsledné AUC nejlepších dvou verzí (porovnává všechny replikace)? (další metriky???)  [AUC]")
+    tmptbl <- temp.g %>%
+      group_by(species) %>%
+      arrange(desc(AUCdiff)) %>%
+      slice_head(n = 2) %>%
+      dplyr::select(species, version, adjust, tune.args)
+
+    tmptbl.null <- tbl.null %>%
+      group_by(species) %>%
+      arrange(desc(AUCdiff)) %>%
+      slice_head(n = 1) %>%
+      dplyr::select(species, version, adjust, tune.args)
+
+
+    for (sp in unique(tmptbl$species)) {
+      print("")
+      print(sp)
+
+      #
+      # top2
+      #
+      print("top2:")
+      top2 <- tmptbl %>% filter(species == sp)
+
+      top2v <- lapply(1:2, function(x) {
+        tmp <- list()
+        tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
+        tmp[["top"]] <- top2[x, ]$version
+
+        # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
+        # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if (nrow(tmp[["t"]]) >= 3) {
+          tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$AUC)$p.value
+        } else {
+          print(" < 3 replikací !!!")
+          tmp[["shapiro.p"]] <- 0
+        }
+        return(tmp)
+      })
+
+      top2v.normality <- sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
+
+      # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
+      # vartest <- var.test(top2v[[1]][["t"]]$AUC, top2v[[2]][["t"]]$AUC)   # p < 0.05 (Variances are not equal)
+      if (top2v.normality) {
+        print("OK (normality)")
+        ttest <- t.test(top2v[[1]][["t"]]$AUC, top2v[[2]][["t"]]$AUC, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+        tmp.top2[["all"]][[sp]][["test"]] <- ttest$p.value
+        tmp.top2[["all"]][[sp]][["test.auc1"]] <- mean(top2v[[1]][["t"]]$AUC)
+        tmp.top2[["all"]][[sp]][["test.auc2"]] <- mean(top2v[[2]][["t"]]$AUC)
+        tmp.top2[["all"]][[sp]][["test.version1"]] <- top2v[[1]][["top"]]
+        tmp.top2[["all"]][[sp]][["test.version2"]] <- top2v[[2]][["top"]]
+      } else {
+        print("auc nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+        tmp.top2[["all"]][[sp]][["test"]] <- NA
+        tmp.top2[["all"]][[sp]][["test.auc1"]] <- NA
+        tmp.top2[["all"]][[sp]][["test.auc2"]] <- NA
+        tmp.top2[["all"]][[sp]][["test.version1"]] <- NA
+        tmp.top2[["all"]][[sp]][["test.version2"]] <- NA
+      }
+
+      #
+      # top1 vs null
+      #
+      print("top1null:")
+      top1null <- tmptbl.null %>% filter(species == sp)
+
+      tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
+
+      if (nrow(tmp.null.t) >= 3) {
+        tmp.null <- shapiro.test(tmp.null.t$AUC)$p.value
+      } else {
+        print("null < 3 replikací !!!")
+        tmp.null <- 0
+      }
+
+      top1null.normality <- sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
+
+      if (top1null.normality) {
+        print("OK (normality)")
+        ttest <- t.test(top2v[[1]][["t"]]$AUC, tmp.null.t$AUC, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+        tmp.top1null[["all"]][[sp]][["test"]] <- ttest$p.value
+        tmp.top1null[["all"]][[sp]][["test.auc1"]] <- mean(top2v[[1]][["t"]]$AUC)
+        tmp.top1null[["all"]][[sp]][["test.auc2"]] <- mean(tmp.null.t$AUC)
+        tmp.top1null[["all"]][[sp]][["test.version1"]] <- top2v[[1]][["top"]]
+        tmp.top1null[["all"]][[sp]][["test.version2"]] <- "un"
+      } else {
+        print("auc (null a 1) nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+        tmp.top1null[["all"]][[sp]][["test"]] <- NA
+        tmp.top1null[["all"]][[sp]][["test.auc1"]] <- NA
+        tmp.top1null[["all"]][[sp]][["test.auc2"]] <- NA
+        tmp.top1null[["all"]][[sp]][["test.version1"]] <- NA
+        tmp.top1null[["all"]][[sp]][["test.version2"]] <- NA
+      }
+    }
+  }
+
   ### ### ###
   ### ### ### startA TEST
   ### ### ###
@@ -947,6 +1297,105 @@ for (at in ndop.fs$aucTresholds) {
 
 
     temp.g.c %<>% filter(version %in% cmp)
+
+    if (at == 0 & verified.generate) {
+      print("liší se výsledné AUC párů verzí (porovnává všechny replikace)? (další metriky???)  [AUC]")
+      print(cmp[1])
+      tmptbl <- temp.g.c %>%
+        group_by(species) %>%
+        arrange(desc(AUCdiff)) %>%
+        slice_head(n = 2) %>%
+        dplyr::select(species, version, adjust, tune.args)
+
+      tmptbl.null <- tbl.null %>%
+        group_by(species) %>%
+        arrange(desc(AUCdiff)) %>%
+        slice_head(n = 1) %>%
+        dplyr::select(species, version, adjust, tune.args)
+
+
+      for (sp in unique(tmptbl$species)) {
+        print("")
+        print(sp)
+
+        #
+        # top2
+        #
+        print("top2:")
+        top2 <- tmptbl %>% filter(species == sp)
+
+        top2v <- lapply(1:2, function(x) {
+          tmp <- list()
+          tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
+          tmp[["top"]] <- top2[x, ]$version
+
+          # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
+          # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          if (nrow(tmp[["t"]]) >= 3) {
+            tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$AUC)$p.value
+          } else {
+            print(" < 3 replikací !!!")
+            tmp[["shapiro.p"]] <- 0
+          }
+          return(tmp)
+        })
+
+        top2v.normality <- sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
+
+        # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
+        # vartest <- var.test(top2v[[1]][["t"]]$AUC, top2v[[2]][["t"]]$AUC)   # p < 0.05 (Variances are not equal)
+        if (top2v.normality) {
+          print("OK (normality)")
+          ttest <- t.test(top2v[[1]][["t"]]$AUC, top2v[[2]][["t"]]$AUC, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+          tmp.top2[[cmp[1]]][[sp]][["test"]] <- ttest$p.value
+          tmp.top2[[cmp[1]]][[sp]][["test.auc1"]] <- mean(top2v[[1]][["t"]]$AUC)
+          tmp.top2[[cmp[1]]][[sp]][["test.auc2"]] <- mean(top2v[[2]][["t"]]$AUC)
+          tmp.top2[[cmp[1]]][[sp]][["test.version1"]] <- top2v[[1]][["top"]]
+          tmp.top2[[cmp[1]]][[sp]][["test.version2"]] <- top2v[[2]][["top"]]
+        } else {
+          print("auc nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+          tmp.top2[[cmp[1]]][[sp]][["test"]] <- NA
+          tmp.top2[[cmp[1]]][[sp]][["test.auc1"]] <- NA
+          tmp.top2[[cmp[1]]][[sp]][["test.auc2"]] <- NA
+          tmp.top2[[cmp[1]]][[sp]][["test.version1"]] <- NA
+          tmp.top2[[cmp[1]]][[sp]][["test.version2"]] <- NA
+        }
+
+        #
+        # top1 vs null
+        #
+        print("top1null:")
+        top1null <- tmptbl.null %>% filter(species == sp)
+
+        tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
+
+        if (nrow(tmp.null.t) >= 3) {
+          tmp.null <- shapiro.test(tmp.null.t$AUC)$p.value
+        } else {
+          print("null < 3 replikací !!!")
+          tmp.null <- 0
+        }
+
+        top1null.normality <- sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
+
+        if (top1null.normality) {
+          print("OK (normality)")
+          ttest <- t.test(top2v[[1]][["t"]]$AUC, tmp.null.t$AUC, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+          tmp.top1null[[cmp[1]]][[sp]][["test"]] <- ttest$p.value
+          tmp.top1null[[cmp[1]]][[sp]][["test.auc1"]] <- mean(top2v[[1]][["t"]]$AUC)
+          tmp.top1null[[cmp[1]]][[sp]][["test.auc2"]] <- mean(tmp.null.t$AUC)
+          tmp.top1null[[cmp[1]]][[sp]][["test.version1"]] <- top2v[[1]][["top"]]
+          tmp.top1null[[cmp[1]]][[sp]][["test.version2"]] <- "un"
+        } else {
+          print("auc (null a 1) nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+          tmp.top1null[[cmp[1]]][[sp]][["test"]] <- NA
+          tmp.top1null[[cmp[1]]][[sp]][["test.auc1"]] <- NA
+          tmp.top1null[[cmp[1]]][[sp]][["test.auc2"]] <- NA
+          tmp.top1null[[cmp[1]]][[sp]][["test.version1"]] <- NA
+          tmp.top1null[[cmp[1]]][[sp]][["test.version2"]] <- NA
+        }
+      }
+    }
 
     ### ### ###
     ### ### ### startA TEST
@@ -1199,6 +1648,11 @@ for (v in c("val", "test")) {
   write.csv(tgob.main.res, paste0(path.PP, "main-sso-version-cumsum.", v, ".csv"), row.names = FALSE)
 }
 
+
+if (verified.generate) {
+  saveRDS(tmp.top2, paste0(path.eval, verified.top2))
+  saveRDS(tmp.top1null, paste0(path.eval, verified.top1null))
+}
 
 end_time <- Sys.time()
 print(end_time - start_time)
