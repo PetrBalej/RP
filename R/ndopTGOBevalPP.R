@@ -68,9 +68,11 @@ verified.top2 <- "verified.top2.rds"
 verified.top1null <- "verified.top1null.rds"
 
 if (file.exists(paste0(path.eval, verified.top2)) & file.exists(paste0(path.eval, verified.top1null))) {
+  print("načítám existující verified.X")
   tmp.top2 <- readRDS(paste0(path.eval, verified.top2))
   tmp.top1null <- readRDS(paste0(path.eval, verified.top1null))
 } else {
+  print("budu generovat verified.X")
   verified.generate <- TRUE
 }
 
@@ -612,10 +614,14 @@ for (at in ndop.fs$aucTresholds) {
     theme_light() +
     theme(
       text = element_text(size = 6),
+      axis.text.y = element_markdown(),
       # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     )
+
+  tt.null <- sapply(tmp.top1null[["all"]], function(x) x$val < 0.05)
+  tt <- sapply(tmp.top2[["all"]], function(x) x$val < 0.05)
 
   # základní + změna řazení
   no <- temp.g %>%
@@ -623,7 +629,9 @@ for (at in ndop.fs$aucTresholds) {
     group_by(species) %>%
     slice_max(auc.val.avgdiff, with_ties = FALSE) %>%
     ungroup() %>%
-    mutate(title = paste0(species, " | ", formatC(auc.val.avg_null, digits = 2, format = "f"), "->", formatC(auc.val.avg, digits = 2, format = "f"))) %>%
+    mutate(tt.null = tt.null) %>%
+    mutate(tt = tt) %>%
+    mutate(title = paste0(ifelse(!is.na(tt.null) & tt.null & !is.na(tt) & tt, paste0("***", species, "***"), ifelse(!is.na(tt.null) & tt.null, paste0("**", species, "**"), ifelse(!is.na(tt) & tt, paste0("*", species, "*"), species))), " | ", formatC(auc.val.avg_null, digits = 2, format = "f"), "->", formatC(auc.val.avg, digits = 2, format = "f"))) %>%
     dplyr::select(title, occs.n, species, auc.val.avgdiff, auc.val.avg, auc.val.avg_null)
 
   title <- unname(unlist(no$title))
@@ -794,10 +802,14 @@ for (at in ndop.fs$aucTresholds) {
       theme_light() +
       theme(
         text = element_text(size = 6),
+        axis.text.y = element_markdown(),
         # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
         panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
         strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
       )
+
+    tt.null <- sapply(tmp.top1null[[cmp[1]]], function(x) x$val < 0.05)
+    tt <- sapply(tmp.top2[[cmp[1]]], function(x) x$val < 0.05)
 
     # základní + změna řazení
     no <- temp.g.c %>%
@@ -805,7 +817,9 @@ for (at in ndop.fs$aucTresholds) {
       group_by(species) %>%
       slice_max(auc.val.avgdiff, with_ties = FALSE) %>%
       ungroup() %>%
-      mutate(title = paste0(species, " | ", formatC(auc.val.avg_null, digits = 2, format = "f"), "->", formatC(auc.val.avg, digits = 2, format = "f"))) %>%
+      mutate(tt.null = tt.null) %>%
+      mutate(tt = tt) %>%
+      mutate(title = paste0(ifelse(!is.na(tt.null) & tt.null & !is.na(tt) & tt, paste0("***", species, "***"), ifelse(!is.na(tt.null) & tt.null, paste0("**", species, "**"), ifelse(!is.na(tt) & tt, paste0("*", species, "*"), species))), " | ", formatC(auc.val.avg_null, digits = 2, format = "f"), "->", formatC(auc.val.avg, digits = 2, format = "f"))) %>%
       dplyr::select(title, occs.n, species, auc.val.avgdiff, auc.val.avg, auc.val.avg_null)
 
     title <- unname(unlist(no$title))
@@ -1227,10 +1241,14 @@ for (at in ndop.fs$aucTresholds) {
     theme_light() +
     theme(
       text = element_text(size = 6),
+      axis.text.y = element_markdown(),
       # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     )
+
+  tt.null <- sapply(tmp.top1null[["all"]], function(x) x$test < 0.05)
+  tt <- sapply(tmp.top2[["all"]], function(x) x$test < 0.05)
 
   # základní + změna řazení
   no <- temp.g %>%
@@ -1238,7 +1256,9 @@ for (at in ndop.fs$aucTresholds) {
     group_by(species) %>%
     slice_max(AUCdiff, with_ties = FALSE) %>%
     ungroup() %>%
-    mutate(title = paste0(species, " | ", formatC(AUC_null, digits = 2, format = "f"), "->", formatC(AUC, digits = 2, format = "f"))) %>%
+    mutate(tt.null = tt.null) %>%
+    mutate(tt = tt) %>%
+    mutate(title = paste0(ifelse(!is.na(tt.null) & tt.null & !is.na(tt) & tt, paste0("***", species, "***"), ifelse(!is.na(tt.null) & tt.null, paste0("**", species, "**"), ifelse(!is.na(tt) & tt, paste0("*", species, "*"), species))), " | ", formatC(AUC_null, digits = 2, format = "f"), "->", formatC(AUC, digits = 2, format = "f"))) %>%
     dplyr::select(title, occs.n, species, AUCdiff, AUC, AUC_null)
 
   title <- unname(unlist(no$title))
@@ -1408,10 +1428,14 @@ for (at in ndop.fs$aucTresholds) {
       theme_light() +
       theme(
         text = element_text(size = 6),
+        axis.text.y = element_markdown(),
         # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
         panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
         strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
       )
+
+    tt.null <- sapply(tmp.top1null[[cmp[1]]], function(x) x$test < 0.05)
+    tt <- sapply(tmp.top2[[cmp[1]]], function(x) x$test < 0.05)
 
     # základní + změna řazení
     no <- temp.g.c %>%
@@ -1419,7 +1443,9 @@ for (at in ndop.fs$aucTresholds) {
       group_by(species) %>%
       slice_max(AUCdiff, with_ties = FALSE) %>%
       ungroup() %>%
-      mutate(title = paste0(species, " | ", formatC(AUC_null, digits = 2, format = "f"), "->", formatC(AUC, digits = 2, format = "f"))) %>%
+      mutate(tt.null = tt.null) %>%
+      mutate(tt = tt) %>%
+      mutate(title = paste0(ifelse(!is.na(tt.null) & tt.null & !is.na(tt) & tt, paste0("***", species, "***"), ifelse(!is.na(tt.null) & tt.null, paste0("**", species, "**"), ifelse(!is.na(tt) & tt, paste0("*", species, "*"), species))), " | ", formatC(AUC_null, digits = 2, format = "f"), "->", formatC(AUC, digits = 2, format = "f"))) %>%
       dplyr::select(title, occs.n, species, AUCdiff, AUC, AUC_null)
 
     title <- unname(unlist(no$title))
