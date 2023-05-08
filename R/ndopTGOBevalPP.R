@@ -493,7 +493,7 @@ for (at in ndop.fs$aucTresholds) {
   title <- unname(unlist(no$title))
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
-  tobs + scale_x_discrete(labels = title.occs.n) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+  tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
   ggsave(paste0(path.PP, "trend-overall-best-species.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
 
@@ -575,7 +575,7 @@ for (at in ndop.fs$aucTresholds) {
     title <- unname(unlist(no$title))
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
-    tobs + scale_x_discrete(labels = title.occs.n) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+    tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
     ggsave(paste0(path.PP, "trend-overall-best-species.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
 
@@ -910,7 +910,7 @@ for (at in ndop.fs$aucTresholds) {
   title <- unname(unlist(no$title))
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
-  tobs + scale_x_discrete(labels = title.occs.n) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+  tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
   ggsave(paste0(path.PP, "trend-overall-best-species.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   # occs.n
@@ -992,7 +992,7 @@ for (at in ndop.fs$aucTresholds) {
     title <- unname(unlist(no$title))
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
-    tobs + scale_x_discrete(labels = title.occs.n) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+    tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
     ggsave(paste0(path.PP, "trend-overall-best-species.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
     # occs.n
