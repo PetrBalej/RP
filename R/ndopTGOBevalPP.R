@@ -1714,31 +1714,20 @@ if (verified.generate) {
   saveRDS(tmp.top1null, paste0(path.eval, verified.top1null))
 }
 
-# převedení verified na tabulky: top2 (páry)
+#
+# significant improvement (t.test)
+#
+
+tmp.top1null.out <- list()
 tmp.top2.out <- list()
-for (tn in names(tmp.top2)) {
-  tmp.top2.t <- t(as_tibble(tmp.top2[[tn]]))
-  rn <- row.names(tmp.top2.t)
-  cn <- names(tmp.top2[[tn]][[1]])
-  tmp.top2.t <- as_tibble(tmp.top2.t)
-
-  tmp.top2.t <- as_tibble(sapply(tmp.top2.t, as.character))
-  names(tmp.top2.t) <- cn
-  tmp.top2.t$species <- rn
-  tmp.top2.t <- as_tibble(tmp.top2.t)
-
-  # změna datových typů sloupců podle obsahu
-  tmp.top2.t %<>% mutate_all(funs(type.convert(as.character(.))))
-
-  tmp.top2.out[[tn]] <- tmp.top2.t
-
-  write.csv(tmp.top2.t, paste0(path.PP, "verified-top2-part-.", tn, ".csv"), row.names = FALSE)
-}
-saveRDS(tmp.top2.out, paste0(path.PP, "top2.out.rds"))
-
+tmp.out <- list()
+tmp.summary <- list()
 # převedení verified na tabulky: top1null (nej vs null)
 tmp.top1null.out <- list()
 for (tn in names(tmp.top1null)) {
+  #
+  ### # top1null
+  #
   tmp.top1null.t <- t(as_tibble(tmp.top1null[[tn]]))
   rn <- row.names(tmp.top1null.t)
   cn <- names(tmp.top1null[[tn]][[1]])
@@ -1752,11 +1741,45 @@ for (tn in names(tmp.top1null)) {
   # změna datových typů sloupců podle obsahu
   tmp.top1null.t %<>% mutate_all(funs(type.convert(as.character(.))))
 
-  tmp.top1null.out[[tn]] <- tmp.top1null.t
+  #
+  ### # top2
+  #
+  tmp.top2.t <- t(as_tibble(tmp.top2[[tn]]))
+  rn <- row.names(tmp.top2.t)
+  cn <- names(tmp.top2[[tn]][[1]])
+  tmp.top2.t <- as_tibble(tmp.top2.t)
 
+  tmp.top2.t <- as_tibble(sapply(tmp.top2.t, as.character))
+  names(tmp.top2.t) <- cn
+  tmp.top2.t$species <- rn
+  tmp.top2.t <- as_tibble(tmp.top2.t)
+
+  # změna datových typů sloupců podle obsahu
+  tmp.top2.t %<>% mutate_all(funs(type.convert(as.character(.))))
+
+  # průběžné výsledky
+  tmp.top1null.out[[tn]] <- tmp.top1null.t
   write.csv(tmp.top1null.t, paste0(path.PP, "verified-top1null-part-.", tn, ".csv"), row.names = FALSE)
+  tmp.top2.out[[tn]] <- tmp.top2.t
+  write.csv(tmp.top2.t, paste0(path.PP, "verified-top2-part-.", tn, ".csv"), row.names = FALSE)
+
+  # výběr jen významných rozdílů + lepších než null
+  tmp.joined <- tmp.top2.t %>% left_join(tmp.top1null.t, by = "species", suffix = c("", "_null"))
+  tmp.joined %<>% mutate(val.lessThanNull = ifelse(val.auc1 < val.auc2_null, 1, 0)) %<>% mutate(test.lessThanNull = ifelse(test.auc1 < test.auc2_null, 1, 0))
+  tmp.joined %<>% mutate(val.different = ifelse(val.lessThanNull == 0 & val < 0.05, 1, 0)) %<>% mutate(test.different = ifelse(test.lessThanNull == 0 & test < 0.05, 1, 0))
+
+  tmp.out[[tn]] <- tmp.joined
+  write.csv(tmp.joined, paste0(path.PP, "verified-joined-part-.", tn, ".csv"), row.names = FALSE)
+
+  # souhrny úspěšných
+  tmp.summary[[tn]][["val"]] <- sum(unlist(tmp.joined$val.different) == 0, na.rm = TRUE)
+  tmp.summary[[tn]][["test"]] <- sum(unlist(tmp.joined$test.different) == 0, na.rm = TRUE)
 }
+
 saveRDS(tmp.top1null.out, paste0(path.PP, "top1null.out.rds"))
+saveRDS(tmp.top2.out, paste0(path.PP, "top2.out.rds"))
+saveRDS(tmp.out, paste0(path.PP, "joined.out.rds"))
+saveRDS(tmp.summary, paste0(path.PP, "summary.out.rds"))
 
 end_time <- Sys.time()
 print(end_time - start_time)
