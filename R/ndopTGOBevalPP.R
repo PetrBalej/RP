@@ -1,7 +1,7 @@
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
-required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "sdmATM", "ggplot2", "grid", "gridExtra") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
+required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "sdmATM", "ggplot2", "grid", "gridExtra", "ggtext") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
 
 install.packages(setdiff(required_packages, rownames(installed.packages())))
 
@@ -496,16 +496,6 @@ for (at in ndop.fs$aucTresholds) {
     # sum(unlist(tmp.top2[["test"]]), na.rm=TRUE)
     # sum(unlist(tmp.top1null[["test"]]), na.rm=TRUE)
 
-    # tmp.top2.t <- t(as_tibble(tmp.top2))
-    # rn <- row.names(tmp.top2.t)
-    # cn <- names(tmp.top2[[1]])
-    # tmp.top2.t <- as.data.frame(tmp.top2.t)
-    # tmp.top2.t <- as_tibble(sapply(tmp.top2.t, as.numeric))
-    # row.names(tmp.top2.t) <- rn
-    # tmp.top2.t <- t(tmp.top2.t)
-    # tmp.top2.t <- as_tibble(tmp.top2.t)
-    # tmp.top2.t$species <- cn
-
 
     print("liší se výsledné AUC nejlepších dvou verzí (porovnává všechny replikace)? (další metriky???)  [auc.val.avg]")
     tmptbl <- temp.g %>%
@@ -622,6 +612,16 @@ for (at in ndop.fs$aucTresholds) {
 
   tt.null <- sapply(tmp.top1null[["all"]], function(x) x$val < 0.05)
   tt <- sapply(tmp.top2[["all"]], function(x) x$val < 0.05)
+
+  # negativní korekce
+  tt.null.minus <- sapply(tmp.top1null[["all"]], function(x) is.na(x$val.auc1 < x$val.auc2) | x$val.auc1 < x$val.auc2)
+  # znegovat případné minusové opravy
+  tt.null[tt.null == TRUE & tt.null.minus == TRUE] <- FALSE
+  tt[tt == TRUE & tt.null.minus == TRUE] <- FALSE
+
+  # omezením druhy pro AUC treshold
+  tt.null <- tt.null[names(tt.null) %in% unique(temp.g$species)]
+  tt <- tt[names(tt) %in% unique(temp.g$species)]
 
   # základní + změna řazení
   no <- temp.g %>%
@@ -810,6 +810,17 @@ for (at in ndop.fs$aucTresholds) {
 
     tt.null <- sapply(tmp.top1null[[cmp[1]]], function(x) x$val < 0.05)
     tt <- sapply(tmp.top2[[cmp[1]]], function(x) x$val < 0.05)
+
+    # negativní korekce
+    tt.null.minus <- sapply(tmp.top1null[[cmp[1]]], function(x) is.na(x$val.auc1 < x$val.auc2) | x$val.auc1 < x$val.auc2)
+    # znegovat případné minusové opravy
+    tt.null[tt.null == TRUE & tt.null.minus == TRUE] <- FALSE
+    tt[tt == TRUE & tt.null.minus == TRUE] <- FALSE
+
+    # omezením druhy pro AUC treshold
+    tt.null <- tt.null[names(tt.null) %in% unique(temp.g.c$species)]
+    tt <- tt[names(tt) %in% unique(temp.g.c$species)]
+
 
     # základní + změna řazení
     no <- temp.g.c %>%
@@ -1250,6 +1261,19 @@ for (at in ndop.fs$aucTresholds) {
   tt.null <- sapply(tmp.top1null[["all"]], function(x) x$test < 0.05)
   tt <- sapply(tmp.top2[["all"]], function(x) x$test < 0.05)
 
+
+  # negativní korekce
+  tt.null.minus <- sapply(tmp.top1null[["all"]], function(x) is.na(x$test.auc1 < x$test.auc2) | x$test.auc1 < x$test.auc2)
+  # znegovat případné minusové opravy
+  tt.null[tt.null == TRUE & tt.null.minus == TRUE] <- FALSE
+  tt[tt == TRUE & tt.null.minus == TRUE] <- FALSE
+
+  # omezením druhy pro AUC treshold
+  tt.null <- tt.null[names(tt.null) %in% unique(temp.g$species)]
+  tt <- tt[names(tt) %in% unique(temp.g$species)]
+
+
+
   # základní + změna řazení
   no <- temp.g %>%
     ungroup() %>%
@@ -1436,6 +1460,16 @@ for (at in ndop.fs$aucTresholds) {
 
     tt.null <- sapply(tmp.top1null[[cmp[1]]], function(x) x$test < 0.05)
     tt <- sapply(tmp.top2[[cmp[1]]], function(x) x$test < 0.05)
+
+    # negativní korekce
+    tt.null.minus <- sapply(tmp.top1null[[cmp[1]]], function(x) is.na(x$test.auc1 < x$test.auc2) | x$test.auc1 < x$test.auc2)
+    # znegovat případné minusové opravy
+    tt.null[tt.null == TRUE & tt.null.minus == TRUE] <- FALSE
+    tt[tt == TRUE & tt.null.minus == TRUE] <- FALSE
+
+    # omezením druhy pro AUC treshold
+    tt.null <- tt.null[names(tt.null) %in% unique(temp.g.c$species)]
+    tt <- tt[names(tt) %in% unique(temp.g.c$species)]
 
     # základní + změna řazení
     no <- temp.g.c %>%
@@ -1679,6 +1713,50 @@ if (verified.generate) {
   saveRDS(tmp.top2, paste0(path.eval, verified.top2))
   saveRDS(tmp.top1null, paste0(path.eval, verified.top1null))
 }
+
+# převedení verified na tabulky: top2 (páry)
+tmp.top2.out <- list()
+for (tn in names(tmp.top2)) {
+  tmp.top2.t <- t(as_tibble(tmp.top2[[tn]]))
+  rn <- row.names(tmp.top2.t)
+  cn <- names(tmp.top2[[tn]][[1]])
+  tmp.top2.t <- as_tibble(tmp.top2.t)
+
+  tmp.top2.t <- as_tibble(sapply(tmp.top2.t, as.character))
+  names(tmp.top2.t) <- cn
+  tmp.top2.t$species <- rn
+  tmp.top2.t <- as_tibble(tmp.top2.t)
+
+  # změna datových typů sloupců podle obsahu
+  tmp.top2.t %<>% mutate_all(funs(type.convert(as.character(.))))
+
+  tmp.top2.out[[tn]] <- tmp.top2.t
+
+  write.csv(tmp.top2.t, paste0(path.PP, "verified-top2-part-.", tn, ".csv"), row.names = FALSE)
+}
+saveRDS(tmp.top2.out, paste0(path.PP, "top2.out.rds"))
+
+# převedení verified na tabulky: top1null (nej vs null)
+tmp.top1null.out <- list()
+for (tn in names(tmp.top1null)) {
+  tmp.top1null.t <- t(as_tibble(tmp.top1null[[tn]]))
+  rn <- row.names(tmp.top1null.t)
+  cn <- names(tmp.top1null[[tn]][[1]])
+  tmp.top1null.t <- as_tibble(tmp.top1null.t)
+
+  tmp.top1null.t <- as_tibble(sapply(tmp.top1null.t, as.character))
+  names(tmp.top1null.t) <- cn
+  tmp.top1null.t$species <- rn
+  tmp.top1null.t <- as_tibble(tmp.top1null.t)
+
+  # změna datových typů sloupců podle obsahu
+  tmp.top1null.t %<>% mutate_all(funs(type.convert(as.character(.))))
+
+  tmp.top1null.out[[tn]] <- tmp.top1null.t
+
+  write.csv(tmp.top1null.t, paste0(path.PP, "verified-top1null-part-.", tn, ".csv"), row.names = FALSE)
+}
+saveRDS(tmp.top1null.out, paste0(path.PP, "top1null.out.rds"))
 
 end_time <- Sys.time()
 print(end_time - start_time)
