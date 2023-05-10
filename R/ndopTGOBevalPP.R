@@ -314,6 +314,13 @@ if (!withThin) {
 
 dir.create(path.PP, showWarnings = FALSE)
 
+path.PP.val <- paste0(path.PP, "val/")
+dir.create(path.PP.val, showWarnings = FALSE)
+path.PP.val.test <- paste0(path.PP, "val.test/")
+dir.create(path.PP.val.test, showWarnings = FALSE)
+path.PP.test <- paste0(path.PP, "test/")
+dir.create(path.PP.test, showWarnings = FALSE)
+
 #
 # porovnání počtu druhů průchozích přes treshold
 #
@@ -403,6 +410,7 @@ for (at in ndop.fs$aucTresholds) {
   # jsou auc.test.avg a AUC u zvolených metod korelované? - až nad filtrovaným datasetem: AUC?
   # měl bych ale spočíst i omision rate nad LSD - tam by měl být smysluplný? + UPR+OPR
   # korelovanost výsledků auc AUC v rámci metod
+  # níže zatím řeším jen korelovanost jak nejlepší val model odpovídá témuž test - neřeším ale nakolik nejlepší val trefuje nejlepší test - to ale dělám ve "val.test", které jsem zatím stopnul uprostřed změn... - dodělat!!!???
 
   zasobnik <- list()
   for (ver in unique(tbl.nn$version)) {
@@ -638,7 +646,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
   tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP, "trend-overall-best-species.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best-species.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
 
   # occs.n
@@ -649,7 +657,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP, "trend-overall-best-species-orderByOccs.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByOccs.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   # auc.val.avgdiff
   no.temp <- no %>%
@@ -659,7 +667,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avgdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP, "trend-overall-best-species-orderByDiff.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByDiff.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   # auc.val.avg
   no.temp <- no %>%
@@ -669,7 +677,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP, "trend-overall-best-species-orderByAuc.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAuc.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   # auc.val.avg_null
   no.temp <- no %>%
@@ -679,7 +687,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP, "trend-overall-best-species-orderByAucNull.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAucNull.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   ### ### ### endB
 
@@ -837,7 +845,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
     tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP, "trend-overall-best-species.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.val, "trend-overall-best-species.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
 
     # occs.n
@@ -848,7 +856,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP, "trend-overall-best-species-orderByOccs.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByOccs.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
     # auc.val.avgdiff
     no.temp <- no %>%
@@ -858,7 +866,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avgdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP, "trend-overall-best-species-orderByDiff.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByDiff.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
     # auc.val.avg
     no.temp <- no %>%
@@ -868,7 +876,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP, "trend-overall-best-species-orderByAuc.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAuc.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
     # auc.val.avg_null
     no.temp <- no %>%
@@ -878,7 +886,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP, "trend-overall-best-species-orderByAucNull.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAucNull.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
     ### ### ### endB
   }
@@ -897,7 +905,7 @@ for (at in ndop.fs$aucTresholds) {
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~version)
-  ggsave(paste0(path.PP, "trend.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.val, "trend.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
 
 
@@ -916,20 +924,28 @@ for (at in ndop.fs$aucTresholds) {
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     )
-  ggsave(paste0(path.PP, "trend-overall.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # a) vše - OVERALL - best
-  ggplot(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avgdiff, with_ties = FALSE), aes(occs.n, auc.val.avgdiff)) +
+  temp.g.t <- temp.g %>%
+    ungroup() %>%
+    group_by(species) %>%
+    slice_max(auc.val.avgdiff, with_ties = FALSE)
+  temp.g.t.clr <- unique(unname(unlist(temp.g.t$clr)))
+  temp.clr <- unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))
+  temp.clr <- temp.clr[temp.clr %in% temp.g.t.clr] # ne vždy musí být ve výsledku všechny verze, nutno případně dofiltrovat, aby seděly barvy a pořadí
+
+  ggplot(temp.g.t, aes(occs.n, auc.val.avgdiff)) +
     geom_point(aes(colour = factor(version)), size = 0.5) +
     geom_smooth(method = loess, size = 0.2) +
-    scale_color_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
+    scale_color_manual(values = temp.clr) +
     theme_light() +
     theme(
       text = element_text(size = 6),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     )
-  ggsave(paste0(path.PP, "trend-overall-best.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   ### ### ### end
 
@@ -957,7 +973,7 @@ for (at in ndop.fs$aucTresholds) {
       panel.margin = unit(0.2, "lines")
     ) +
     facet_wrap(~species, labeller = as_labeller(title))
-  ggsave(paste0(path.PP, "version-species.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.val, "version-species.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
 
 
@@ -985,7 +1001,7 @@ for (at in ndop.fs$aucTresholds) {
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
-  ggsave(paste0(path.PP, "boxplot.val.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
+  ggsave(paste0(path.PP.val, "boxplot.val.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
 
 
 
@@ -1014,7 +1030,7 @@ for (at in ndop.fs$aucTresholds) {
     }
   }
   combs[[as.character(at)]][["val"]] <- res %<>% arrange(desc(AUCdiffSum))
-  write.csv(res, paste0(path.PP, "combs-val-", as.character(at), ".csv"), row.names = FALSE)
+  write.csv(res, paste0(path.PP.val, "combs-val-", as.character(at), ".csv"), row.names = FALSE)
 
 
   ################################################################################################################################################################################
@@ -1059,7 +1075,7 @@ for (at in ndop.fs$aucTresholds) {
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
-  ggsave(paste0(path.PP, "boxplot.val.test.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
+  ggsave(paste0(path.PP.val.test, "boxplot.val.test.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
 
 
   # a) vše
@@ -1073,7 +1089,7 @@ for (at in ndop.fs$aucTresholds) {
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~version)
-  ggsave(paste0(path.PP, "trend.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.val.test, "trend.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # porovnání přispění verzí per species
   title <- unname(unlist(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avg, with_ties = FALSE) %>% ungroup() %>% mutate(title = paste0(species, "\n", formatC(auc.val.avg_null, digits = 2, format = "f"), " -> ", formatC(auc.val.avg, digits = 2, format = "f"))) %>% dplyr::select(title)))
@@ -1090,7 +1106,7 @@ for (at in ndop.fs$aucTresholds) {
       panel.margin = unit(0.2, "lines")
     ) +
     facet_wrap(~species, labeller = as_labeller(title))
-  ggsave(paste0(path.PP, "version-species.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.val.test, "version-species.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # přispění kombinací
   temp.g %<>% ungroup()
@@ -1117,7 +1133,7 @@ for (at in ndop.fs$aucTresholds) {
     }
   }
   combs[[as.character(at)]][["val.test"]] <- res %<>% arrange(desc(AUCdiffSum))
-  write.csv(res, paste0(path.PP, "combs-val.test-", as.character(at), ".csv"), row.names = FALSE)
+  write.csv(res, paste0(path.PP.val.test, "combs-val.test-", as.character(at), ".csv"), row.names = FALSE)
 
 
 
@@ -1289,7 +1305,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
   tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP, "trend-overall-best-species.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best-species.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   # occs.n
   no.temp <- no %>%
@@ -1299,7 +1315,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP, "trend-overall-best-species-orderByOccs.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByOccs.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   # AUCdiff
   no.temp <- no %>%
@@ -1309,7 +1325,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUCdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP, "trend-overall-best-species-orderByDiff.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   # AUC
   no.temp <- no %>%
@@ -1319,7 +1335,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP, "trend-overall-best-species-orderByAuc.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAuc.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   # AUC_null
   no.temp <- no %>%
@@ -1329,7 +1345,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP, "trend-overall-best-species-orderByAucNull.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAucNull.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   ### ### ### endB
 
@@ -1486,7 +1502,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
     tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP, "trend-overall-best-species.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.test, "trend-overall-best-species.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
     # occs.n
     no.temp <- no %>%
@@ -1496,7 +1512,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP, "trend-overall-best-species-orderByOccs.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByOccs.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
     # AUCdiff
     no.temp <- no %>%
@@ -1506,7 +1522,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUCdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP, "trend-overall-best-species-orderByDiff.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
     # AUC
     no.temp <- no %>%
@@ -1516,7 +1532,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP, "trend-overall-best-species-orderByAuc.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAuc.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
     # AUC_null
     no.temp <- no %>%
@@ -1526,7 +1542,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP, "trend-overall-best-species-orderByAucNull.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAucNull.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
 
     ### ### ### endB
   }
@@ -1545,7 +1561,7 @@ for (at in ndop.fs$aucTresholds) {
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
     facet_wrap(~version)
-  ggsave(paste0(path.PP, "trend.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.test, "trend.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
 
   ### ### ### start
@@ -1563,20 +1579,28 @@ for (at in ndop.fs$aucTresholds) {
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     )
-  ggsave(paste0(path.PP, "trend-overall.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
   # a) vše - OVERALL - best
-  ggplot(temp.g %>% ungroup() %>% group_by(species) %>% slice_max(AUCdiff, with_ties = FALSE), aes(occs.n, AUCdiff)) +
+  temp.g.t <- temp.g %>%
+    ungroup() %>%
+    group_by(species) %>%
+    slice_max(AUCdiff, with_ties = FALSE)
+  temp.g.t.clr <- unique(unname(unlist(temp.g.t$clr)))
+  temp.clr <- unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))
+  temp.clr <- temp.clr[temp.clr %in% temp.g.t.clr] # ne vždy musí být ve výsledku všechny verze, nutno případně dofiltrovat, aby seděly barvy a pořadí
+
+  ggplot(temp.g.t, aes(occs.n, AUCdiff)) +
     geom_point(aes(colour = factor(version)), size = 0.5) +
     geom_smooth(method = loess, size = 0.2) +
-    scale_color_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
+    scale_color_manual(values = temp.clr) +
     theme_light() +
     theme(
       text = element_text(size = 6),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     )
-  ggsave(paste0(path.PP, "trend-overall-best.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
 
 
@@ -1601,7 +1625,7 @@ for (at in ndop.fs$aucTresholds) {
       panel.margin = unit(0.2, "lines")
     ) +
     facet_wrap(~species, labeller = as_labeller(title))
-  ggsave(paste0(path.PP, "version-species.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.test, "version-species.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
 
 
 
@@ -1629,7 +1653,7 @@ for (at in ndop.fs$aucTresholds) {
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
-  ggsave(paste0(path.PP, "boxplot.test.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
+  ggsave(paste0(path.PP.test, "boxplot.test.", as.character(at), ".png"), width = 1500, height = 1000, units = "px")
 
 
 
@@ -1659,7 +1683,7 @@ for (at in ndop.fs$aucTresholds) {
     }
   }
   combs[[as.character(at)]][["test"]] <- res %<>% arrange(desc(AUCdiffSum))
-  write.csv(res, paste0(path.PP, "combs-test-", as.character(at), ".csv"), row.names = FALSE)
+  write.csv(res, paste0(path.PP.test, "combs-test-", as.character(at), ".csv"), row.names = FALSE)
 }
 
 saveRDS(combs, paste0(path.PP, "combs.rds"))
