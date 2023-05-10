@@ -75,16 +75,16 @@ knitr::include_graphics(paste0(path.PP.test,"version-species.test.0.png"))
 
 ## Tabulkové souhrny
 
-### [10] Párový scénář: zdrojová varianta X a přidání Xsso  (X -> X+Xsso)
+### [10] Párový scénář: zdrojová varianta X a přispění přidání Xsso  (X -> X|Xsso)
 
 ```{r}
-knitr::kable(t1)
+knitr::kable(t1, digits=4)
 ```
 
 ### [11] Postupný scénář: TGOB -> TGOB+TSAO+TO+TS -> předchozí + Xsso
 
 ```{r}
-knitr::kable(t2)
+knitr::kable(t2, digits=4)
 ```
 
 ### [12] Součet druhů s významným AUC Diff oproti random backgroundu (t.test, p-value < 0.05) podle verzí

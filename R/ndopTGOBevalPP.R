@@ -1720,7 +1720,7 @@ for (v in c("val", "test")) {
     arrange(versionComb) %>%
     dplyr::select(AUCdiffSum, mean, AUCdiffMedian, versionComb)
   # manual reorder
-  combs.select.res <- combs.select.res[c(1:5, 8, 4, 7), ]
+  combs.select.res <- combs.select.res[c(1:5, 8, 6, 7), ]
   write.csv(combs.select.res, paste0(path.PP, "pair-sso-version-cumsum.", v, ".csv"), row.names = FALSE)
 
   # TGOB + další řádné + sso
@@ -1790,7 +1790,7 @@ for (tn in names(tmp.top1null)) {
   # výběr jen významných rozdílů + lepších než null
   tmp.joined <- tmp.top2.t %>% left_join(tmp.top1null.t, by = "species", suffix = c("", "_null"))
   tmp.joined %<>% mutate(val.lessThanNull = ifelse(val.auc1 < val.auc2_null, 1, 0)) %<>% mutate(test.lessThanNull = ifelse(test.auc1 < test.auc2_null, 1, 0))
-  tmp.joined %<>% mutate(val.different = ifelse(val.lessThanNull == 0 & val < 0.05, 1, 0)) %<>% mutate(test.different = ifelse(test.lessThanNull == 0 & test < 0.05, 1, 0))
+  tmp.joined %<>% mutate(val.different = ifelse(val.lessThanNull == 0 & val < 0.05, 1, 0)) %<>% mutate(test.different = ifelse(test.lessThanNull == 0 & test < 0.05, 1, 0)) # !!! správně val_null test_null - ale je tam něco jiného!?!?
 
   tmp.out[[tn]] <- tmp.joined
   write.csv(tmp.joined, paste0(path.PP, "verified-joined-part-.", tn, ".csv"), row.names = FALSE)
@@ -1810,16 +1810,22 @@ saveRDS(tmp.summary, paste0(path.PP, "summary.out.rds"))
 # reporty
 #
 
-t1 <- combs.select.res %>%
-  mutate(AUCdiffSum_diff = ifelse(row_number() %% 2 == 0, AUCdiffSum - lag(AUCdiffSum), NA)) %>%
-  mutate(mean_diff = ifelse(row_number() %% 2 == 0, mean - lag(mean), NA)) %>%
-  mutate(AUCdiffMedian_diff = ifelse(row_number() %% 2 == 0, AUCdiffMedian - lag(AUCdiffMedian), NA))
+t1.temp <- combs.select.res %>%
+  mutate(AUCdiffSum_contrib = ifelse(row_number() %% 2 == 0, AUCdiffSum - lag(AUCdiffSum), NA)) %>%
+  mutate(mean_contrib = ifelse(row_number() %% 2 == 0, mean - lag(mean), NA)) %>%
+  mutate(AUCdiffMedian_contrib = ifelse(row_number() %% 2 == 0, AUCdiffMedian - lag(AUCdiffMedian), NA))
 
+t1a <-t1.temp  %>% dplyr::select(c(1,2,4)) %>% rename(version = "versionComb")
+t1b <- t1.temp  %>% dplyr::select(4:6) %>% na.omit()  
+t1a <- t1a[c(1,3,5,7),] 
+t1a$s <- "|"
+tAll <- t1a  %>% add_column(t1b)
+t1 <- tAll[ ,c(3, 1, 2, 4:7)]
 
 t2 <- tgob.main.res %>%
-  mutate(AUCdiffSum_diff = AUCdiffSum - lag(AUCdiffSum)) %>%
-  mutate(mean_diff = mean - lag(mean)) %>%
-  mutate(AUCdiffMedian_diff = AUCdiffMedian - lag(AUCdiffMedian))
+  mutate(AUCdiffSum_contrib = AUCdiffSum - lag(AUCdiffSum)) %>%
+  mutate(mean_contrib = mean - lag(mean)) %>%
+  mutate(AUCdiffMedian_contrib = AUCdiffMedian - lag(AUCdiffMedian))
 
 # statisticky významné zlepšení druhů
 tmp.different.test <- sapply(tmp.summary, function(x) x$test)
