@@ -1,0 +1,94 @@
+---
+title: Souhrn
+output:
+  html_document:
+    toc: true
+    mathjax: null
+---
+
+
+# Diff AUC (rozdíl oproti random background na 110 druzích) pro jednotlivé varianty
+
+## Základní přehled
+
+### [1] boxploty
+
+```{r out.width="1000px"}
+knitr::include_graphics(paste0(path.PP.test, "boxplot.test.0.png"))
+```
+
+### [2] body (occs.n = počet obsazených čtverců pro jednotlivé druhy, aka prevalence)
+
+```{r out.width="1000px"}
+knitr::include_graphics(paste0(path.PP.test, "trend.test.0.png"))
+```
+
+### [3] souhrn nejlepších variant - body (occs.n = počet obsazených čtverců pro jednotlivé druhy, aka prevalence)
+
+```{r out.width="1000px"}
+knitr::include_graphics(paste0(path.PP.test, "trend-overall-best.test.0.png"))
+```
+
+## Cirkusy, sloupce barevně značí nejlepší variantu
+
+### [4a] Všechny verze. Abecední řazení
+
+```{r out.width="1000px"}
+knitr::include_graphics(paste0(path.PP.test, "trend-overall-best-species.test.0.png"))
+```
+
+### [4b] Všechny verze. Řazeno dle Diff AUC
+
+```{r out.width="1000px"}
+knitr::include_graphics(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.0.png"))
+```
+
+### [5b] Páry: TGOB+TGOBsso. Řazeno dle Diff AUC
+
+```{r out.width="1000px"}
+knitr::include_graphics(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.0---TGOB.png"))
+```
+
+### [6b] Páry: TS+TSsso. Řazeno dle Diff AUC
+
+```{r out.width="1000px"}
+knitr::include_graphics(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.0---TS.png"))
+```
+
+### [7b] Páry: TSAO+TSAOsso. Řazeno dle Diff AUC
+
+```{r out.width="1000px"}
+knitr::include_graphics(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.0---TSAO.png"))
+```
+
+### [8b] Páry: TO+TOsso. Řazeno dle Diff AUC
+
+```{r out.width="1000px"}
+knitr::include_graphics(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.0---TO.png"))
+```
+
+### [9] Jednotlivé druhy a přispění variant
+
+```{r out.width="1000px"}
+knitr::include_graphics(paste0(path.PP.test,"version-species.test.0.png"))
+```
+
+## Tabulkové souhrny
+
+### [10] Párový scénář: zdrojová varianta X a přidání Xsso  (X -> X+Xsso)
+
+```{r}
+knitr::kable(t1)
+```
+
+### [11] Postupný scénář: TGOB -> TGOB+TSAO+TO+TS -> předchozí + Xsso
+
+```{r}
+knitr::kable(t2)
+```
+
+### [12] Součet druhů s významným AUC Diff oproti random backgroundu (t.test, p-value < 0.05) podle verzí
+
+```{r}
+knitr::kable(t3)
+```

@@ -1,7 +1,7 @@
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
-required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "sdmATM", "ggplot2", "grid", "gridExtra", "ggtext") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
+required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "sdmATM", "ggplot2", "grid", "gridExtra", "ggtext", "rmarkdown") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
 
 install.packages(setdiff(required_packages, rownames(installed.packages())))
 
@@ -997,7 +997,7 @@ for (at in ndop.fs$aucTresholds) {
     theme_light() +
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
-      legend.position = "none", text = element_text(size = 4),
+      legend.position = "none", text = element_text(size = 5),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
@@ -1649,7 +1649,7 @@ for (at in ndop.fs$aucTresholds) {
     theme_light() +
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
-      legend.position = "none", text = element_text(size = 4),
+      legend.position = "none", text = element_text(size = 5),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
@@ -1804,6 +1804,29 @@ saveRDS(tmp.top1null.out, paste0(path.PP, "top1null.out.rds"))
 saveRDS(tmp.top2.out, paste0(path.PP, "top2.out.rds"))
 saveRDS(tmp.out, paste0(path.PP, "joined.out.rds"))
 saveRDS(tmp.summary, paste0(path.PP, "summary.out.rds"))
+
+
+#
+# reporty
+#
+
+t1 <- combs.select.res %>%
+  mutate(AUCdiffSum_diff = ifelse(row_number() %% 2 == 0, AUCdiffSum - lag(AUCdiffSum), NA)) %>%
+  mutate(mean_diff = ifelse(row_number() %% 2 == 0, mean - lag(mean), NA)) %>%
+  mutate(AUCdiffMedian_diff = ifelse(row_number() %% 2 == 0, AUCdiffMedian - lag(AUCdiffMedian), NA))
+
+
+t2 <- tgob.main.res %>%
+  mutate(AUCdiffSum_diff = AUCdiffSum - lag(AUCdiffSum)) %>%
+  mutate(mean_diff = mean - lag(mean)) %>%
+  mutate(AUCdiffMedian_diff = AUCdiffMedian - lag(AUCdiffMedian))
+
+# statisticky významné zlepšení druhů
+tmp.different.test <- sapply(tmp.summary, function(x) x$test)
+t3 <- as_tibble(list("version" = names(tmp.different.test), speciesImproved = tmp.different.test))
+
+rmarkdown::render(paste0(path.wd, "report.Rmd"), "all")
+
 
 end_time <- Sys.time()
 print(end_time - start_time)
