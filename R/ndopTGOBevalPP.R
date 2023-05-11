@@ -62,6 +62,8 @@ withNull <- FALSE
 # remove thin to get only TGOB derived versions
 withThin <- FALSE
 
+minReps <- 5
+
 # generování ověření rozdílnosti verzí t.test-em (trvá extrémně dlouho, kešuju)
 verified.generate <- FALSE
 verified.top2 <- "verified.top2.rds"
@@ -139,11 +141,15 @@ if (file.exists(modelsResults.avg)) {
   # průměry z replikací
   tbl.avg <- tbl %>%
     group_by(version, adjust, tune.args, species) %>%
+    mutate(nRep = n_distinct(rep)) %>%
+    filter(nRep >= minReps) %>%
     summarise_if(is.numeric, mean, na.rm = TRUE)
   # vyloučené sloupce doplním znovu zpět
   summarised.not <- setdiff(names(tbl), names(tbl.avg)) # odstranit sloupec rep - nedává smysl
   tbl.not <- tbl %>%
     group_by(version, adjust, tune.args, species) %>%
+    mutate(nRep = n_distinct(rep)) %>%
+    filter(nRep >= minReps) %>%
     slice_head(n = 1) %>%
     ungroup() %>%
     dplyr::select(all_of(summarised.not))
@@ -233,6 +239,17 @@ names(selection.colors) <- paste0("^", selection.rename, "$")
 #
 
 tbl.rep %<>% ungroup() %>% mutate(id = row_number())
+
+# vyhodit kombinace s malým počtem replikací
+tbl.rep.minReps <- tbl.rep %>%
+  group_by(version, adjust, tune.args, species) %>%
+  mutate(nRep = n_distinct(rep)) %>%
+  filter(nRep < minReps) %>%
+  ungroup() %>%
+  dplyr::select(id)
+
+tbl.rep.minReps <- unique(unlist(tbl.rep.minReps))
+tbl.rep %<>% filter(id %notin% tbl.rep.minReps)
 
 tbl.rep.null.ids <- tbl.rep %>% filter(version == "un" & adjust == "0")
 tbl.rep.null.ids.unique <- unique(tbl.rep.null.ids$id)
@@ -489,7 +506,7 @@ for (at in ndop.fs$aucTresholds) {
 
   temp.g %<>% left_join(temp.g.median, by = "version")
 
-
+  gc()
   if (at == 0 & verified.generate) {
     tmp.top2 <- list()
     tmp.top1null <- list()
@@ -700,6 +717,7 @@ for (at in ndop.fs$aucTresholds) {
 
     temp.g.c %<>% filter(version %in% cmp)
 
+    gc()
     if (at == 0 & verified.generate) {
       print("liší se výsledné AUC párů verzí (porovnává všechny replikace)? (další metriky???)  [auc.val.avg]")
       print(cmp[1])
@@ -973,7 +991,7 @@ for (at in ndop.fs$aucTresholds) {
       panel.margin = unit(0.2, "lines")
     ) +
     facet_wrap(~species, labeller = as_labeller(title))
-  ggsave(paste0(path.PP.val, "version-species.val.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.val, "version-species.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
 
 
@@ -1106,7 +1124,7 @@ for (at in ndop.fs$aucTresholds) {
       panel.margin = unit(0.2, "lines")
     ) +
     facet_wrap(~species, labeller = as_labeller(title))
-  ggsave(paste0(path.PP.val.test, "version-species.val.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.val.test, "version-species.val.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
   # přispění kombinací
   temp.g %<>% ungroup()
@@ -1158,7 +1176,7 @@ for (at in ndop.fs$aucTresholds) {
 
   temp.g %<>% left_join(temp.g.median, by = "version")
 
-
+  gc()
   if (at == 0 & verified.generate) {
     print("liší se výsledné AUC nejlepších dvou verzí (porovnává všechny replikace)? (další metriky???)  [AUC]")
     tmptbl <- temp.g %>%
@@ -1358,6 +1376,7 @@ for (at in ndop.fs$aucTresholds) {
 
     temp.g.c %<>% filter(version %in% cmp)
 
+    gc()
     if (at == 0 & verified.generate) {
       print("liší se výsledné AUC párů verzí (porovnává všechny replikace)? (další metriky???)  [AUC]")
       print(cmp[1])
@@ -1625,7 +1644,7 @@ for (at in ndop.fs$aucTresholds) {
       panel.margin = unit(0.2, "lines")
     ) +
     facet_wrap(~species, labeller = as_labeller(title))
-  ggsave(paste0(path.PP.test, "version-species.test.", as.character(at), ".png"), width = 2000, height = 1500, units = "px")
+  ggsave(paste0(path.PP.test, "version-species.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
 
 
 
@@ -1686,6 +1705,12 @@ for (at in ndop.fs$aucTresholds) {
   write.csv(res, paste0(path.PP.test, "combs-test-", as.character(at), ".csv"), row.names = FALSE)
 }
 
+if (verified.generate) {
+  saveRDS(tmp.top2, paste0(path.eval, verified.top2))
+  saveRDS(tmp.top1null, paste0(path.eval, verified.top1null))
+}
+gc()
+
 saveRDS(combs, paste0(path.PP, "combs.rds"))
 
 
@@ -1705,38 +1730,6 @@ write.csv(summary_zasobnik.t, paste0(path.PP, "version-species-treshold-count.cs
 
 saveRDS(zasobnik0, paste0(path.PP, "version-species-treshold-count.rds"))
 
-#
-# souhrny
-#
-
-pairs.main <- names(pairs.compare)
-pairs.sso <- sapply(pairs.compare, function(x) paste(x, collapse = "|"))
-
-for (v in c("val", "test")) {
-  # párový přínost sso verzí
-  combs.select <- c(pairs.main, pairs.sso)
-  combs.select.res <- combs[["0"]][[v]] %>%
-    filter(versionComb %in% combs.select) %>%
-    arrange(versionComb) %>%
-    dplyr::select(AUCdiffSum, mean, AUCdiffMedian, versionComb)
-  # manual reorder
-  combs.select.res <- combs.select.res[c(1:5, 8, 6, 7), ]
-  write.csv(combs.select.res, paste0(path.PP, "pair-sso-version-cumsum.", v, ".csv"), row.names = FALSE)
-
-  # TGOB + další řádné + sso
-  tgob.main.res <- combs[["0"]][[v]] %>%
-    filter(versionComb %in% c(pairs.main[1], paste(pairs.main, collapse = "|"))) %>%
-    arrange(versionComb) %>%
-    dplyr::select(AUCdiffSum, mean, AUCdiffMedian, versionComb)
-  tgob.main.res %<>% add_row(combs[["0"]][[v]] %>% slice_head(n = 1) %>% dplyr::select(AUCdiffSum, mean, AUCdiffMedian, versionComb))
-  write.csv(tgob.main.res, paste0(path.PP, "main-sso-version-cumsum.", v, ".csv"), row.names = FALSE)
-}
-
-
-if (verified.generate) {
-  saveRDS(tmp.top2, paste0(path.eval, verified.top2))
-  saveRDS(tmp.top1null, paste0(path.eval, verified.top1null))
-}
 
 #
 # significant improvement (t.test)
@@ -1790,7 +1783,7 @@ for (tn in names(tmp.top1null)) {
   # výběr jen významných rozdílů + lepších než null
   tmp.joined <- tmp.top2.t %>% left_join(tmp.top1null.t, by = "species", suffix = c("", "_null"))
   tmp.joined %<>% mutate(val.lessThanNull = ifelse(val.auc1 < val.auc2_null, 1, 0)) %<>% mutate(test.lessThanNull = ifelse(test.auc1 < test.auc2_null, 1, 0))
-  tmp.joined %<>% mutate(val.different = ifelse(val.lessThanNull == 0 & val < 0.05, 1, 0)) %<>% mutate(test.different = ifelse(test.lessThanNull == 0 & test < 0.05, 1, 0)) # !!! správně val_null test_null - ale je tam něco jiného!?!?
+  tmp.joined %<>% mutate(val.different = ifelse(val.lessThanNull == 0 & val < 0.05, 1, 0)) %<>% mutate(test.different = ifelse(test.lessThanNull == 0 & test < 0.05, 1, 0)) # !!! správně val_null test_null - ale je tam něco jiného!?!?!!!
 
   tmp.out[[tn]] <- tmp.joined
   write.csv(tmp.joined, paste0(path.PP, "verified-joined-part-.", tn, ".csv"), row.names = FALSE)
@@ -1807,32 +1800,112 @@ saveRDS(tmp.summary, paste0(path.PP, "summary.out.rds"))
 
 
 #
+# souhrny
+#
+
+pairs.main <- names(pairs.compare)
+pairs.sso <- sapply(pairs.compare, function(x) paste(x, collapse = "|"))
+combs.select.res.both <- list()
+
+for (v in c("val", "test")) {
+  print(v)
+  # párový přínost sso verzí
+  combs.select <- c(pairs.main, pairs.sso)
+  combs.select.res <- combs[["0"]][[v]] %>%
+    filter(versionComb %in% combs.select) %>%
+    arrange(versionComb) %>%
+    dplyr::select(AUCdiffSum, mean, AUCdiffMedian, versionComb)
+  # manual reorder
+  combs.select.res <- combs.select.res[c(1:5, 8, 6, 7), ]
+  write.csv(combs.select.res, paste0(path.PP, "pair-sso-version-cumsum.", v, ".csv"), row.names = FALSE)
+
+  # TGOB + další řádné + sso
+  tgob.main.res <- combs[["0"]][[v]] %>%
+    filter(versionComb %in% c(pairs.main[1], paste(pairs.main, collapse = "|"))) %>%
+    arrange(versionComb) %>%
+    dplyr::select(AUCdiffSum, mean, AUCdiffMedian, versionComb)
+  tgob.main.res %<>% add_row(combs[["0"]][[v]] %>% slice_head(n = 1) %>% dplyr::select(AUCdiffSum, mean, AUCdiffMedian, versionComb))
+  write.csv(tgob.main.res, paste0(path.PP, "main-sso-version-cumsum.", v, ".csv"), row.names = FALSE)
+
+  #
+  ### souhrnné tabulky
+  #
+  combs.select.res.both[[v]][["t1"]] <- combs.select.res %>%
+    mutate(AUCdiffSum_contrib = ifelse(row_number() %% 2 == 0, AUCdiffSum - lag(AUCdiffSum), NA)) %>%
+    mutate(mean_contrib = ifelse(row_number() %% 2 == 0, mean - lag(mean), NA)) %>%
+    mutate(AUCdiffMedian_contrib = ifelse(row_number() %% 2 == 0, AUCdiffMedian - lag(AUCdiffMedian), NA))
+
+  t1a <- combs.select.res.both[[v]][["t1"]] %>%
+    dplyr::select(c(1, 2, 4)) %>%
+    rename(version = "versionComb")
+  t1b <- combs.select.res.both[[v]][["t1"]] %>%
+    dplyr::select(4:6) %>%
+    na.omit()
+  t1a <- t1a[c(1, 3, 5, 7), ]
+  t1a$s <- "|"
+  tAll <- t1a %>% add_column(t1b)
+  t1 <- tAll[, c(3, 1, 2, 4:7)]
+
+  combs.select.res.both[[v]][["t2"]] <- tgob.main.res %>%
+    mutate(AUCdiffSum_contrib = AUCdiffSum - lag(AUCdiffSum)) %>%
+    mutate(mean_contrib = mean - lag(mean)) %>%
+    mutate(AUCdiffMedian_contrib = AUCdiffMedian - lag(AUCdiffMedian))
+
+  # statisticky významné zlepšení druhů
+  tmp.different.test <- sapply(tmp.summary, function(x) x[[v]])
+
+  combs.select.res.both[[v]][["t3"]] <- as_tibble(list("version" = names(tmp.different.test), speciesImproved = tmp.different.test)) %>% arrange(tolower(version))
+  combs.select.res.both[[v]][["t3"]]$version <- c("all", t1b$versionComb) # přepsat poárovými, tak je to ve skutečnosti...
+}
+
+
+
+
+#
 # reporty
 #
 
-t1.temp <- combs.select.res %>%
-  mutate(AUCdiffSum_contrib = ifelse(row_number() %% 2 == 0, AUCdiffSum - lag(AUCdiffSum), NA)) %>%
-  mutate(mean_contrib = ifelse(row_number() %% 2 == 0, mean - lag(mean), NA)) %>%
-  mutate(AUCdiffMedian_contrib = ifelse(row_number() %% 2 == 0, AUCdiffMedian - lag(AUCdiffMedian), NA))
+# # včetně negativních!? odělat i odfiltrovanou verzi bez negativních hodnot diffů!!! - stačilo by nebrat negativní hodnoty?
+# t1.temp <- combs.select.res.both[["test"]] %>%
+#   mutate(AUCdiffSum_contrib = ifelse(row_number() %% 2 == 0, AUCdiffSum - lag(AUCdiffSum), NA)) %>%
+#   mutate(mean_contrib = ifelse(row_number() %% 2 == 0, mean - lag(mean), NA)) %>%
+#   mutate(AUCdiffMedian_contrib = ifelse(row_number() %% 2 == 0, AUCdiffMedian - lag(AUCdiffMedian), NA))
 
-t1a <-t1.temp  %>% dplyr::select(c(1,2,4)) %>% rename(version = "versionComb")
-t1b <- t1.temp  %>% dplyr::select(4:6) %>% na.omit()  
-t1a <- t1a[c(1,3,5,7),] 
-t1a$s <- "|"
-tAll <- t1a  %>% add_column(t1b)
-t1 <- tAll[ ,c(3, 1, 2, 4:7)]
+# t1a <- t1.temp %>%
+#   dplyr::select(c(1, 2, 4)) %>%
+#   rename(version = "versionComb")
+# t1b <- t1.temp %>%
+#   dplyr::select(4:6) %>%
+#   na.omit()
+# t1a <- t1a[c(1, 3, 5, 7), ]
+# t1a$s <- "|"
+# tAll <- t1a %>% add_column(t1b)
+# t1 <- tAll[, c(3, 1, 2, 4:7)]
 
-t2 <- tgob.main.res %>%
-  mutate(AUCdiffSum_contrib = AUCdiffSum - lag(AUCdiffSum)) %>%
-  mutate(mean_contrib = mean - lag(mean)) %>%
-  mutate(AUCdiffMedian_contrib = AUCdiffMedian - lag(AUCdiffMedian))
+# t2 <- tgob.main.res %>%
+#   mutate(AUCdiffSum_contrib = AUCdiffSum - lag(AUCdiffSum)) %>%
+#   mutate(mean_contrib = mean - lag(mean)) %>%
+#   mutate(AUCdiffMedian_contrib = AUCdiffMedian - lag(AUCdiffMedian))
 
-# statisticky významné zlepšení druhů
-tmp.different.test <- sapply(tmp.summary, function(x) x$test)
-t3 <- as_tibble(list("version" = names(tmp.different.test), speciesImproved = tmp.different.test))
+# # statisticky významné zlepšení druhů
+# tmp.different.test <- sapply(tmp.summary, function(x) x$test)
+# t3 <- as_tibble(list("version" = names(tmp.different.test), speciesImproved = tmp.different.test)) %>% arrange(tolower(version))
+# t3$version <- c("all", t1$versionComb) # přepsat poárovými, tak je to ve skutečnosti...
 
-rmarkdown::render(paste0(path.wd, "report.Rmd"), "all")
+rmarkdown::render(paste0(path.wd, "report.Rmd"), "all", paste0(path.PP, "report.html"))
 
 
 end_time <- Sys.time()
 print(end_time - start_time)
+
+# tmp.top2 <- list()
+# tmp.top1null <- list()
+
+# for (l1 in names(verified.top1nullA)) {
+#   for (l2 in names(verified.top1nullA[[l1]])) {
+#     tmp.top1null[[l1]][[l2]] <- append(verified.top1nullA[[l1]][[l2]], verified.top1nullB[[l1]][[l2]])
+#     tmp.top2[[l1]][[l2]] <- append(verified.top2A[[l1]][[l2]], verified.top2B[[l1]][[l2]])
+#   }
+# }
+# saveRDS(tmp.top2, paste0(path.eval, verified.top2))
+# saveRDS(tmp.top1null, paste0(path.eval, verified.top1null))
