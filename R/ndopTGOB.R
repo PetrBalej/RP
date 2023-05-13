@@ -175,7 +175,7 @@ if (file.exists(fn)) {
 }
 
 prefix <- "nc_"
-cn <- names(tgobV$t)
+cn <- names(tgobV$p)
 cn_prefix <- cn[str_detect(cn, paste0("^", prefix))]
 
 ndop.stat.res.sp.selected <- ndop.stat.res.sp %>%
@@ -373,49 +373,80 @@ repeat {
     # TGOB ssos
     ssos.sp <- cn_prefix[str_detect(cn_prefix, paste0(druh, "$"))]
 
-    versions.base <- c("TGOB", "TO", "TS")
+    versions.base <- c("TGOB", "TO", "TS", "TO.w", "TS.w")
 
-    for (vn in versions.base) {
+    ao.sp <- ssos.sp[!str_detect(ssos.sp, "sso_")]
+    ao.sp <- gsub(prefix, "", ao.sp)
+
+    ssos.sp <- ssos.sp[str_detect(ssos.sp, "sso_")]
+    # ssos.sp <- gsub(prefix, "", ssos.sp)
+
+    for (vn in c(versions.base, ao.sp)) {
         print("----------------------------------------------------------------------------------")
         print(vn)
+        vns <- strsplit(vn, "_")[[1]][1] # odstraním případnou příponu s druhem
+        print(vns)
         p.temp <- NA
         # základní verze
         if (vn == "TGOB") {
-            p.temp <- tgobV$t %>% dplyr::select(geometry)
+            p.temp <- tgobV$p %>% dplyr::select(geometry)
         } else {
-            p.temp <- tgobV$t %>%
-                filter(!!sym(paste0(prefix, vn)) == 1) %>%
-                dplyr::select(geometry)
+            if (str_detect(vn, "\\.w")) {
+                # beru všechny Top, ale musím odstranit NA, bez vah
+                p.temp <- tgobV$p %>%
+                    filter(!is.na(!!sym(paste0(prefix, vn)))) %>%
+                    dplyr::select(geometry, !!sym(paste0(prefix, vn)))
+            } else {
+                p.temp <- tgobV$p %>%
+                    filter(!!sym(paste0(prefix, vn)) == 1) %>%
+                    dplyr::select(geometry)
+            }
         }
         if (nrow(p.temp) < 1) {
             print("neexistují presence základní verze!!!")
             next
         }
-        collector[[vn]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = "bg", anisotropic = TRUE)
+
+        if (str_detect(vn, "\\.w")) {
+            collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(prefix, vn)]], output = c("bg"), anisotropic = TRUE)
+        } else {
+            collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = c("bg"), anisotropic = TRUE)
+        }
+
 
         # ssos podverze ze základních
-        for (vn.ssos in ssos.sp) {
-            p.temp <- NA
-            vns <- paste0(strsplit(vn.ssos, "_")[[1]][2], vn)
-            print("-------------")
-            print(vns)
-            if (vn == "TGOB") {
-                p.temp <- tgobV$t %>%
-                    filter(!!sym(vn.ssos) == 1) %>%
-                    dplyr::select(geometry)
+        p.temp <- NA
+        vns <- paste0(vns, ".", strsplit(ssos.sp, "_")[[1]][2]) # přidám příponu sso
+        print("sso ------------")
+        print(vns)
+
+        if (vn == "TGOB") {
+            p.temp <- tgobV$p %>%
+                filter(!!sym(ssos.sp) == 1) %>%
+                dplyr::select(geometry)
+        } else {
+            if (str_detect(vn, "\\.w")) {
+                # beru všechny Top, ale musím odstranit NA, bez vah
+                p.temp <- tgobV$p %>%
+                    filter(!is.na(!!sym(paste0(prefix, vn)))) %>%
+                    filter(!!sym(ssos.sp) == 1) %>%
+                    dplyr::select(geometry, !!sym(paste0(prefix, vn)))
             } else {
-                p.temp <- tgobV$t %>%
+                p.temp <- tgobV$p %>%
                     filter(!!sym(paste0(prefix, vn)) == 1) %>%
-                    filter(!!sym(vn.ssos) == 1) %>%
+                    filter(!!sym(ssos.sp) == 1) %>%
                     dplyr::select(geometry)
             }
+        }
+        if (nrow(p.temp) < 1) {
+            print("neexistují presence základní verze!!!")
+            next
+        }
 
-            if (nrow(p.temp) < 1) {
-                print("neexistují presence ssos podverze!!!")
-                next
-            }
-
-            collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = "bg", anisotropic = TRUE)
+        if (str_detect(vn, "\\.w")) {
+            collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(prefix, vn)]], output = c("bg"), anisotropic = TRUE)
+        } else {
+            collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = c("bg"), anisotropic = TRUE)
         }
     }
 
@@ -578,8 +609,8 @@ repeat {
         }
     }
 
-    saveRDS(e.mx.all, paste0(path.tgob, "5ssos_", druh, "_", rep, ".rds"))
-    saveRDS(out.t, paste0(path.tgob, "t_5ssos_", druh, "_", rep, ".rds"))
+    saveRDS(e.mx.all, paste0(path.tgob, "6ssos_", druh, "_", rep, ".rds"))
+    saveRDS(out.t, paste0(path.tgob, "t_6ssos_", druh, "_", rep, ".rds"))
     gc()
     # } # for DRUH
 }
