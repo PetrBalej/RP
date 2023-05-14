@@ -528,56 +528,57 @@ repeat {
 
     # příprava rasterů pro scénář: seskupení do jedné společné verze per adjust
     # ndop.fs$scenario.selected
+    if (ndop.fs$scenario == "brAll") {
+        collector.temp <- list()
+        scenario.names <- names(ndop.fs$scenarios)
+        for (scenario.name in scenario.names) {
+            scenario <- unname(unlist(ndop.fs$scenarios[scenario.name]))
+            collector.selected <- collector[scenario]
 
-    collector.temp <- list()
-    scenario.names <- names(ndop.fs$scenarios)
-    for (scenario.name in scenario.names) {
-        scenario <- unname(unlist(ndop.fs$scenarios[scenario.name]))
-        collector.selected <- collector[scenario]
+            collector.selected.r <- lapply(collector.selected, function(x) x$br)
 
-        collector.selected.r <- lapply(collector.selected, function(x) x$br)
-
-        adjust.names <- names(collector.selected.r[[1]])
-        version.names <- names(collector.selected.r)
-        brs <- list()
-        for (vn in version.names) {
-            for (an in adjust.names) {
-                brs[[an]][[vn]] <- collector.selected.r[[vn]][[an]]
+            adjust.names <- names(collector.selected.r[[1]])
+            version.names <- names(collector.selected.r)
+            brs <- list()
+            for (vn in version.names) {
+                for (an in adjust.names) {
+                    brs[[an]][[vn]] <- collector.selected.r[[vn]][[an]]
+                }
             }
-        }
 
-        # počet verzí bias rasterů
-        scenario.n <- length(scenario)
+            # počet verzí bias rasterů
+            scenario.n <- length(scenario)
 
-        brs.stack <- sapply(brs, function(x) {
-              rs <- raster::stack(x)
+            brs.stack <- sapply(brs, function(x) {
+                rs <- raster::stack(x)
                 names(rs) <- names(x)
-            return(rs)
-        })
+                return(rs)
+            })
 
-        brs.stack.vif <- list()
-        if (scenario.n > 1) {
-            for (ran in names(brs.stack)) {
-                rs.temp <- brs.stack[[ran]]
-                # vifstep
-                vs <- vifstep(rs.temp, th = 3)
-                # vifcor - jen pro dofiltr, asi není nutné
-                vs.vc <- vifcor(rs.temp[[vs@results$Variables]], th = 0.7)
-                rs.temp_vifs <- rs.temp[[vs.vc@results$Variables]]
+            brs.stack.vif <- list()
+            if (scenario.n > 1) {
+                for (ran in names(brs.stack)) {
+                    rs.temp <- brs.stack[[ran]]
+                    # vifstep
+                    vs <- vifstep(rs.temp, th = 3)
+                    # vifcor - jen pro dofiltr, asi není nutné
+                    vs.vc <- vifcor(rs.temp[[vs@results$Variables]], th = 0.7)
+                    rs.temp_vifs <- rs.temp[[vs.vc@results$Variables]]
 
-                brs.stack.vif[[ran]] <- rs.temp_vifs
+                    brs.stack.vif[[ran]] <- rs.temp_vifs
+                }
+            } else {
+                brs.stack.vif <- brs.stack
             }
-        } else {
-            brs.stack.vif <- brs.stack
+
+            collector.temp[[scenario.name]][["bg"]] <- as.list(sapply(adjust.names, function(x) NA))
+            collector.temp[[scenario.name]][["br"]] <- brs.stack.vif
         }
 
-        collector.temp[[scenario.name]][["bg"]] <- as.list(sapply(adjust.names, function(x) NA))
-        collector.temp[[scenario.name]][["br"]] <- brs.stack.vif
+        collector.temp[["un"]] <- collector[["un"]]
+
+        collector <- collector.temp
     }
-
-    collector.temp[["un"]] <- collector[["un"]]
-
-    collector <- collector.temp
 
     gc()
     # run vsech variant BG s ENMeval
