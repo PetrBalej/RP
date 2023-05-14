@@ -113,7 +113,9 @@ ndop.fs <- list(
     "replicates" = 10,
     "speciesPart" = cmd_arg, "version" = "v1",
     "bgRaster" = FALSE,
-    "versionNames" = vn, "versionSmooting" = vf
+    "versionNames" = vn, "versionSmooting" = vf,
+    "outputBgBr" = c("bg"), # c("bg", "br")
+    "scenario" = "bg" # "bg", "br", "brAll"
 )
 
 
@@ -408,9 +410,9 @@ repeat {
         }
 
         if (str_detect(vn, "\\.w")) {
-            collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(prefix, vn)]], output = c("bg"), anisotropic = TRUE)
+            collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(prefix, vn)]], output = ndop.fs$outputBgBr, anisotropic = TRUE)
         } else {
-            collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = c("bg"), anisotropic = TRUE)
+            collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
         }
 
 
@@ -444,9 +446,9 @@ repeat {
         }
 
         if (str_detect(vn, "\\.w")) {
-            collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(prefix, vn)]], output = c("bg"), anisotropic = TRUE)
+            collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(prefix, vn)]], output = ndop.fs$outputBgBr, anisotropic = TRUE)
         } else {
-            collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = c("bg"), anisotropic = TRUE)
+            collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
         }
     }
 
@@ -511,10 +513,24 @@ repeat {
         for (adjust in names(collector[[id]][["bg"]])) {
             print(adjust)
 
-            bg.temp <- as.data.frame(st_coordinates(collector[[id]][["bg"]][[adjust]]))
+            if (ndop.fs$scenario == "bg") {
+                bg.temp <- as.data.frame(st_coordinates(collector[[id]][["bg"]][[adjust]]))
+                block.bg <- collector[[id]][["bg"]][[adjust]] %>% st_join(bCV.poly)
+                predictors.temp <- predictors
+                print("původní prediktory")
+            }
+            if (ndop.fs$scenario == "br") {
+                # dávám všude stený random, přidávám bias raster k prediktorům
+                bg.temp <- as.data.frame(st_coordinates(collector[["un"]][["bg"]][[0]]))
+                block.bg <- collector[["un"]][["bg"]][[0]] %>% st_join(bCV.poly)
+                bg.temp <- as.data.frame(st_coordinates(collector[[id]][["br"]][[adjust]]))
+                predictors.temp <- stack(predictors, collector[[id]][["br"]][[adjust]])
+                print("přidaný jeden bias raster")
+                print(length(names(predictors.temp)))
+            }
+
             names(bg.temp) <- ll
 
-            block.bg <- collector[[id]][["bg"]][[adjust]] %>% st_join(bCV.poly)
             block.p <- pres.unique %>% st_join(bCV.poly)
 
             print("základní:")
@@ -529,7 +545,7 @@ repeat {
                         ee.temp <- ENMevaluate(
                             user.grp = list("occs.grp" = block.p$fold, "bg.grp" = block.bg$fold),
                             occs = df.temp,
-                            envs = predictors,
+                            envs = predictors.temp,
                             bg = bg.temp,
                             algorithm = "maxnet", partitions = "user",
                             # partition.settings = list("kfolds" = 3),
@@ -573,7 +589,7 @@ repeat {
                                 ee.temp <- ENMevaluate(
                                     user.grp = list("occs.grp" = block.pt$fold, "bg.grp" = block.bg$fold),
                                     occs = df.temp.thin,
-                                    envs = predictors,
+                                    envs = predictors.temp,
                                     bg = bg.temp,
                                     algorithm = "maxnet", partitions = "user",
                                     # partition.settings = list("kfolds" = 3),
