@@ -24,7 +24,7 @@ print(cmd_arg)
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
-required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "ecospat", "blockCV", "tgbg", "sdmATM") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
+required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "ecospat", "blockCV", "tgbg", "sdmATM", "usdm") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
 
 install.packages(setdiff(required_packages, rownames(installed.packages())))
 
@@ -102,6 +102,12 @@ vn <- versionNames()
 
 vf <- list("1" = 1:8, "0" = 9)
 
+
+# scénáře výběru bias rasterů k prediktorům
+scenario.selected.all <- c("TGOB", "TGOB.sso", "TO", "TO.sso", "TS", "TS.sso", "TO.w", "TO.w.sso", "TS.w", "TS.w.sso", "TS.AO", "TS.AO.sso", "TS.AO.w", "TS.AO.w.sso", "TO.AO", "TO.AO.sso", "TO.AO.w", "TO.AO.w.sso", "un")
+scenario.selected.base <- scenario.selected.all[!str_detect(scenario.selected.all, "sso|w|AO")]
+scenario.selected.base.w <- scenario.selected.all[str_detect(scenario.selected.all, "\\.w|TGOB")]
+
 ndop.fs <- list(
     "adjusts" = c(0.1, 1, 2, 3),
     "tuneArgs" = list(fc = c("L", "LQ", "LQH"), rm = c(0.5, 1, 2, 3, 4)), # , "H", "LQH", "LQHP"
@@ -114,8 +120,9 @@ ndop.fs <- list(
     "speciesPart" = cmd_arg, "version" = "v1",
     "bgRaster" = FALSE,
     "versionNames" = vn, "versionSmooting" = vf,
-    "outputBgBr" = c("bg"), # c("bg", "br")
-    "scenario" = "bg" # "bg", "br", "brAll"
+    "outputBgBr" = c("br"), # c("bg", "br")
+    "scenario" = "brAll", # "bg", "br", "brAll"
+    "scenario.selected" = scenario.selected.base.w
 )
 
 
@@ -504,6 +511,50 @@ repeat {
         collector.thin[[id]][[thinDist]] <- occs.thinned %>% st_as_sf(coords = c("x", "y"), crs = 4326)
     }
 
+    # příprava rasterů pro scénář: seskupení do jedné společné verze per adjust
+    # ndop.fs$scenario.selected
+
+    collector.selected <- collector[ndop.fs$scenario.selected]
+
+    collector.selected.r <- lapply(collector.selected, function(x) x$br)
+
+    adjust.names <- names(collector.selected.r[[1]])
+    version.names <- names(collector.selected.r)
+    brs <- list()
+    for (vn in version.names) {
+        for (an in adjust.names) {
+            brs[[an]][[vn]] <- collector.selected.r[[vn]][[an]]
+        }
+    }
+
+    brs.stack <- sapply(brs, function(x) {
+        rs <- stack(x)
+        names(rs) <- names(x)
+        return(rs)
+    })
+
+    brs.stack.vif <- list()
+    for (ran in names(brs.stack)) {
+        rs.temp <- brs.stack[[ran]]
+
+        # vifstep
+        vs <- vifstep(rs.temp, th = 3)
+        # vifcor - jen pro dofiltr, asi není nutné
+        vs.vc <- vifcor(rs.temp[[vs@results$Variables]], th = 0.7)
+
+        rs.temp_vifs <- rs.temp[[vs.vc@results$Variables]]
+
+        brs.stack.vif[[ran]] <- rs.temp_vifs
+    }
+
+    version.multi <- paste(scenario.selected.base.w, collapse = "_")
+    collector.temp <- list()
+    collector.temp[[version.multi]][["bg"]] <- as.list(sapply(adjust.names, function(x) NA))
+    collector.temp[[version.multi]][["br"]] <- brs.stack.vif
+    collector.temp[["un"]] <- collector[["un"]]
+
+    collector <- collector.temp
+
     gc()
     # run vsech variant BG s ENMeval
     for (id in names(collector)) {
@@ -519,14 +570,19 @@ repeat {
                 predictors.temp <- predictors
                 print("původní prediktory")
             }
-            if (ndop.fs$scenario == "br") {
-                # dávám všude stený random, přidávám bias raster k prediktorům
-                bg.temp <- as.data.frame(st_coordinates(collector[["un"]][["bg"]][[0]]))
-                block.bg <- collector[["un"]][["bg"]][[0]] %>% st_join(bCV.poly)
-                bg.temp <- as.data.frame(st_coordinates(collector[[id]][["br"]][[adjust]]))
-                predictors.temp <- stack(predictors, collector[[id]][["br"]][[adjust]])
-                print("přidaný jeden bias raster")
-                print(length(names(predictors.temp)))
+            if (ndop.fs$scenario == "br" | ndop.fs$scenario == "brAll") {
+                # dávám všude stený random, přidávám bias raster(y) k prediktorům
+                bg.temp <- as.data.frame(st_coordinates(collector[["un"]][["bg"]][["0"]]))
+                block.bg <- collector[["un"]][["bg"]][["0"]] %>% st_join(bCV.poly)
+                if ("un" == id) {
+                    # k random nepřidávám bias rastery
+                    predictors.temp <- predictors
+                } else {
+                    predictors.temp <- stack(predictors, collector[[id]][["br"]][[adjust]])
+                    print("přidány bias raster(y)")
+                    print(length(names(predictors.temp)))
+                    print(names(predictors.temp))
+                }
             }
 
             names(bg.temp) <- ll
