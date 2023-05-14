@@ -108,6 +108,21 @@ scenario.selected.all <- c("TGOB", "TGOB.sso", "TO", "TO.sso", "TS", "TS.sso", "
 scenario.selected.base <- scenario.selected.all[!str_detect(scenario.selected.all, "sso|w|AO")]
 scenario.selected.base.w <- scenario.selected.all[str_detect(scenario.selected.all, "\\.w|TGOB")]
 
+
+scenarios.selected <- list(
+    "1" = "TGOB",
+    "2" = "TS.w",
+    "3" = "TO.w",
+    "4" = "TS.AO.w",
+    "5" = "TO.AO.w",
+    "1.sso" = "TGOB.sso",
+    "2.sso" = "TS.w.sso",
+    "3.sso" = "TO.w.sso",
+    "4.sso" = "TS.AO.w.sso",
+    "5.sso" = "TO.AO.w.sso",
+    "6" = scenario.selected.base.w
+)
+
 ndop.fs <- list(
     "adjusts" = c(0.1, 1, 2, 3),
     "tuneArgs" = list(fc = c("L", "LQ", "LQH"), rm = c(0.5, 1, 2, 3, 4)), # , "H", "LQH", "LQHP"
@@ -122,7 +137,7 @@ ndop.fs <- list(
     "versionNames" = vn, "versionSmooting" = vf,
     "outputBgBr" = c("br"), # c("bg", "br")
     "scenario" = "brAll", # "bg", "br", "brAll"
-    "scenario.selected" = scenario.selected.base.w
+    "scenarios" = scenarios.selected
 )
 
 
@@ -514,43 +529,52 @@ repeat {
     # příprava rasterů pro scénář: seskupení do jedné společné verze per adjust
     # ndop.fs$scenario.selected
 
-    collector.selected <- collector[ndop.fs$scenario.selected]
-
-    collector.selected.r <- lapply(collector.selected, function(x) x$br)
-
-    adjust.names <- names(collector.selected.r[[1]])
-    version.names <- names(collector.selected.r)
-    brs <- list()
-    for (vn in version.names) {
-        for (an in adjust.names) {
-            brs[[an]][[vn]] <- collector.selected.r[[vn]][[an]]
-        }
-    }
-
-    brs.stack <- sapply(brs, function(x) {
-        rs <- stack(x)
-        names(rs) <- names(x)
-        return(rs)
-    })
-
-    brs.stack.vif <- list()
-    for (ran in names(brs.stack)) {
-        rs.temp <- brs.stack[[ran]]
-
-        # vifstep
-        vs <- vifstep(rs.temp, th = 3)
-        # vifcor - jen pro dofiltr, asi není nutné
-        vs.vc <- vifcor(rs.temp[[vs@results$Variables]], th = 0.7)
-
-        rs.temp_vifs <- rs.temp[[vs.vc@results$Variables]]
-
-        brs.stack.vif[[ran]] <- rs.temp_vifs
-    }
-
-    version.multi <- paste(scenario.selected.base.w, collapse = "_")
     collector.temp <- list()
-    collector.temp[[version.multi]][["bg"]] <- as.list(sapply(adjust.names, function(x) NA))
-    collector.temp[[version.multi]][["br"]] <- brs.stack.vif
+    scenario.names <- names(ndop.fs$scenarios)
+    for (scenario.name in scenario.names) {
+        scenario <- unname(unlist(ndop.fs$scenarios[scenario.name]))
+        collector.selected <- collector[scenario]
+
+        collector.selected.r <- lapply(collector.selected, function(x) x$br)
+
+        adjust.names <- names(collector.selected.r[[1]])
+        version.names <- names(collector.selected.r)
+        brs <- list()
+        for (vn in version.names) {
+            for (an in adjust.names) {
+                brs[[an]][[vn]] <- collector.selected.r[[vn]][[an]]
+            }
+        }
+
+        # počet verzí bias rasterů
+        scenario.n <- length(scenario)
+
+        brs.stack <- sapply(brs, function(x) {
+              rs <- raster::stack(x)
+                names(rs) <- names(x)
+            return(rs)
+        })
+
+        brs.stack.vif <- list()
+        if (scenario.n > 1) {
+            for (ran in names(brs.stack)) {
+                rs.temp <- brs.stack[[ran]]
+                # vifstep
+                vs <- vifstep(rs.temp, th = 3)
+                # vifcor - jen pro dofiltr, asi není nutné
+                vs.vc <- vifcor(rs.temp[[vs@results$Variables]], th = 0.7)
+                rs.temp_vifs <- rs.temp[[vs.vc@results$Variables]]
+
+                brs.stack.vif[[ran]] <- rs.temp_vifs
+            }
+        } else {
+            brs.stack.vif <- brs.stack
+        }
+
+        collector.temp[[scenario.name]][["bg"]] <- as.list(sapply(adjust.names, function(x) NA))
+        collector.temp[[scenario.name]][["br"]] <- brs.stack.vif
+    }
+
     collector.temp[["un"]] <- collector[["un"]]
 
     collector <- collector.temp
