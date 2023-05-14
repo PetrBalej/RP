@@ -587,7 +587,7 @@ repeat {
 
                                 ee.temp@results[["species"]] <- druh
                                 ee.temp@results[["version"]] <- id
-                                ee.temp@results[["adjust"]] <- adjust
+                                ee.temp@results[["adjust"]] <- thinDist
 
                                 temp.t <- ee.temp@results %>% left_join(ei, by = "tune.args")
 
