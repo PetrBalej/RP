@@ -16,6 +16,7 @@ print(cmd_arg)
 # install_local("/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/tgbg/tgbg", force = TRUE, build=TRUE)
 # vlastní nutné modifikace existujících balíčků:
 # install_github("PetrBalej/sdm", force = TRUE, ref="advancedTresholdMetrics", build=TRUE)
+# install_github("PetrBalej/usdm", force = TRUE, ref="pb", build=TRUE)
 # install_github("PetrBalej/ENMeval/", force = TRUE, build=TRUE) # přímo v masteru (+ je vhodné ponechávat původní název? - různé plusy i minusy, už jsem řešil...)
 # devtools::document("/mnt/2AA56BAE3BB1EC2E/Downloads/rgee2/tgbg/tgbg")
 
@@ -24,7 +25,7 @@ print(cmd_arg)
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
-required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "ecospat", "blockCV", "tgbg", "sdmATM", "usdm") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
+required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "ecospat", "blockCV", "tgbg", "sdmATM", "usdmPB") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
 
 install.packages(setdiff(required_packages, rownames(installed.packages())))
 
@@ -109,7 +110,7 @@ scenario.selected.base <- scenario.selected.all[!str_detect(scenario.selected.al
 scenario.selected.base.w <- scenario.selected.all[str_detect(scenario.selected.all, "\\.w|TGOB")]
 
 
-scenarios.selected <- list(
+scenarios.selected.puv <- list(
     "1" = "TGOB",
     "2" = "TS.w",
     "3" = "TO.w",
@@ -123,6 +124,60 @@ scenarios.selected <- list(
     "6" = scenario.selected.base.w
 )
 
+scenarios.selected.puv2 <- list(
+    "1" = "TGOB",
+    "2" = "TS.w",
+    "3" = "TO.w",
+    "4" = "TGOB.sso.w",
+    "5" = c("TGOB", "TS.w", "TO.w", "TGOB.sso.w")
+)
+
+scenarios.selected.puv8 <- list(
+    "1" = "TGOB",
+    "2" = "TS.w",
+    "3" = "TO.w",
+    "4" = "TGOB.sso.w"
+)
+
+scenarios.selected.puv9 <- list(
+    "1" = "TGOB",
+    "2" = "TS.w",
+    "3" = "TO.w",
+    "4" = "TGOB.sso.w",
+    "5" = "TGOB.sso.w.dpois.mean",
+    "6" = "TGOB.sso.w.dpois.median",
+    "7" = "TGOB.sso.w.dnorm.mean",
+    "8" = "TGOB.sso.w.dnorm.median"
+)
+
+scenarios.selected <- list(
+    "1" = "TGOB",
+    "2" = "TS.w",
+    "3" = "TO.w",
+    "4" = "TS.AO.w",
+    "5" = "TO.AO.w",
+    #
+    # "1.sso" = "TGOB.sso",
+    # "2.sso" = "TS.w.sso",
+    # "3.sso" = "TO.w.sso",
+    # "4.sso" = "TS.AO.w.sso",
+    # "5.sso" = "TO.AO.w.sso",
+    #
+    "1.sso.w" = "TGOB.sso.w",
+    "1.sso.w.3" = "TGOB.sso.w.3",
+    #
+    "1.sso.w.dnorm1.mean" = "TGOB.sso.w.dnorm1.mean",
+    "1.sso.w.3.dnorm1.mean" = "TGOB.sso.w.3.dnorm1.mean",
+    "1.sso.w.dnorm1.median" = "TGOB.sso.w.dnorm1.median",
+    "1.sso.w.3.dnorm1.median" = "TGOB.sso.w.3.dnorm1.median",
+    #
+    "1.sso.w.dnorm2.mean" = "TGOB.sso.w.dnorm2.mean",
+    "1.sso.w.3.dnorm2.mean" = "TGOB.sso.w.3.dnorm2.mean",
+    "1.sso.w.dnorm2.median" = "TGOB.sso.w.dnorm2.median",
+    "1.sso.w.3.dnorm2.median" = "TGOB.sso.w.3.dnorm2.median"
+)
+
+
 ndop.fs <- list(
     "adjusts" = c(0.1, 1, 2, 3),
     "tuneArgs" = list(fc = c("L", "LQ", "LQH"), rm = c(0.5, 1, 2, 3, 4)), # , "H", "LQH", "LQHP"
@@ -135,8 +190,8 @@ ndop.fs <- list(
     "speciesPart" = cmd_arg, "version" = "v1",
     "bgRaster" = FALSE,
     "versionNames" = vn, "versionSmooting" = vf,
-    "outputBgBr" = c("br"), # c("bg", "br")
-    "scenario" = "brAll", # "bg", "br", "brAll"
+    "outputBgBr" = c("bg", "br"), # c("bg", "br")
+    "scenario" = "bgAll", # "bg", "br", "brAll", "bgAll"
     "scenarios" = scenarios.selected
 )
 
@@ -191,10 +246,18 @@ evalIndep <- function(m, lsd.temp) {
 fn <- paste0(path.tgob, "tgobV.rds")
 if (file.exists(fn)) {
     print("načítám existující tgobV.rds")
-    tgobV <- readRDS(fn)
+    # tgobV <- readRDS(fn)
+
+    # # dočasně, nepoužívám AO - odstranit, ať to nežere místo
+    # tgbg.names  <-  names(tgobV$p)
+    # tgobV$p %<>% dplyr::select(tgbg.names[!str_detect(tgbg.names, "\\.AO")])
+    # tgbg.names  <-  names(tgobV$p)
+    # tgobV$p %<>% dplyr::select(tgbg.names[!str_detect(tgbg.names, "sso_")])
+    # saveRDS(tgobV, paste0(path.tgob, "tgobV2.rds"))
+    tgobV <- readRDS("D:/PersonalWork/Balej/v2/RP/dataPrep/ndopTGOB/tgobV2.rds")
 } else {
     print("generuju nový tgobV.rds")
-    tgobV <- tgbg::tgobVersions(ndopP, predictors[[1]], species = "DRUH", observers = "AUTOR")
+    tgobV <- tgbg::tgobVersions(ndopP, predictors[[1]], species = "DRUH", observers = "AUTOR", species.select = lsd.pa.min$TaxonNameLAT)
     saveRDS(tgobV, fn)
 }
 
@@ -397,71 +460,52 @@ repeat {
     # TGOB ssos
     ssos.sp <- cn_prefix[str_detect(cn_prefix, paste0(druh, "$"))]
 
-    versions.base <- c("TGOB", "TO", "TS", "TO.w", "TS.w")
-
+    versions.base.puv <- c("TGOB", "TO", "TS", "TO.w", "TS.w")
+    versions.base <- c("TGOB", "TO.w", "TS.w")
     ao.sp <- ssos.sp[!str_detect(ssos.sp, "sso_")]
-    ao.sp <- gsub(prefix, "", ao.sp)
+    ao.sp.puv <- gsub(prefix, "", ao.sp)
+    ao.sp <- c()
+    ssos.w <- ssos.sp[str_detect(ssos.sp, "sso\\.w")]
+    ssos.w <- gsub(prefix, "", ssos.w)
 
     ssos.sp <- ssos.sp[str_detect(ssos.sp, "sso_")]
     # ssos.sp <- gsub(prefix, "", ssos.sp)
 
-    for (vn in c(versions.base, ao.sp)) {
+    for (vn in c(versions.base, ao.sp, ssos.w)) {
         print("----------------------------------------------------------------------------------")
         print(vn)
         vns <- strsplit(vn, "_")[[1]][1] # odstraním případnou příponu s druhem
         print(vns)
         p.temp <- NA
+
+        print("odstraním focus species (pro generování bias rasterů) - vede k overprediction") # zrušeno (teď pro bg scénář)
+        print(druh)
+        print(nrow(tgobV$p %>% filter(DRUH == druh)))
+
         # základní verze
         if (vn == "TGOB") {
-            p.temp <- tgobV$p %>% dplyr::select(geometry)
-        } else {
-            if (str_detect(vn, "\\.w")) {
-                # beru všechny Top, ale musím odstranit NA, bez vah
-                p.temp <- tgobV$p %>%
-                    filter(!is.na(!!sym(paste0(prefix, vn)))) %>%
-                    dplyr::select(geometry, !!sym(paste0(prefix, vn)))
-            } else {
-                p.temp <- tgobV$p %>%
-                    filter(!!sym(paste0(prefix, vn)) == 1) %>%
-                    dplyr::select(geometry)
-            }
-        }
-        if (nrow(p.temp) < 1) {
-            print("neexistují presence základní verze!!!")
-            next
-        }
-
-        if (str_detect(vn, "\\.w")) {
-            collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(prefix, vn)]], output = ndop.fs$outputBgBr, anisotropic = TRUE)
-        } else {
-            collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
-        }
-
-
-        # ssos podverze ze základních
-        p.temp <- NA
-        vns <- paste0(vns, ".", strsplit(ssos.sp, "_")[[1]][2]) # přidám příponu sso
-        print("sso ------------")
-        print(vns)
-
-        if (vn == "TGOB") {
             p.temp <- tgobV$p %>%
-                filter(!!sym(ssos.sp) == 1) %>%
+                # filter(DRUH != druh) %>%
+                dplyr::select(geometry)
+            # zkresluju podle druhu
+            p.temp.bss <- tgobV$p %>%
+                filter(DRUH == druh) %>%
                 dplyr::select(geometry)
         } else {
             if (str_detect(vn, "\\.w")) {
                 # beru všechny Top, ale musím odstranit NA, bez vah
                 p.temp <- tgobV$p %>%
+                    # filter(DRUH != druh) %>%
                     filter(!is.na(!!sym(paste0(prefix, vn)))) %>%
-                    filter(!!sym(ssos.sp) == 1) %>%
                     dplyr::select(geometry, !!sym(paste0(prefix, vn)))
             } else {
                 p.temp <- tgobV$p %>%
+                    # filter(DRUH != druh) %>%
                     filter(!!sym(paste0(prefix, vn)) == 1) %>%
-                    filter(!!sym(ssos.sp) == 1) %>%
                     dplyr::select(geometry)
             }
         }
+
         if (nrow(p.temp) < 1) {
             print("neexistují presence základní verze!!!")
             next
@@ -471,7 +515,50 @@ repeat {
             collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(prefix, vn)]], output = ndop.fs$outputBgBr, anisotropic = TRUE)
         } else {
             collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
+
+            if (vn == "TGOB") {
+                # zkresluju podle druhu
+                collector[[paste0(vns, ".bss")]] <- tgbg::bg(p.temp.bss, predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
+            }
         }
+
+        # if (!str_detect(vn, "sso\\.w")) {
+        # # ssos podverze ze základních, nedělám ale z už vážených sso, tam je ten výběr proveden už při vzniku
+        # p.temp <- NA
+        # vns <- paste0(vns, ".", strsplit(ssos.sp, "_")[[1]][2]) # přidám příponu sso
+        # print("sso ------------")
+        # print(vns)
+
+        # if (vn == "TGOB") {
+        #     p.temp <- tgobV$p %>%
+        #         filter(!!sym(ssos.sp) == 1) %>%
+        #         dplyr::select(geometry)
+        # } else {
+        #     if (str_detect(vn, "\\.w")) {
+        #         # beru všechny Top, ale musím odstranit NA, bez vah
+        #         p.temp <- tgobV$p %>%
+        #             filter(!is.na(!!sym(paste0(prefix, vn)))) %>%
+        #             filter(!!sym(ssos.sp) == 1) %>%
+        #             dplyr::select(geometry, !!sym(paste0(prefix, vn)))
+        #     } else {
+        #         p.temp <- tgobV$p %>%
+        #             filter(!!sym(paste0(prefix, vn)) == 1) %>%
+        #             filter(!!sym(ssos.sp) == 1) %>%
+        #             dplyr::select(geometry)
+        #     }
+        # }
+        # if (nrow(p.temp) < 1) {
+        #     print("neexistují presence základní verze!!!")
+        #     next
+        # }
+
+        # if (str_detect(vn, "\\.w")) {
+        #     collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(prefix, vn)]], output = ndop.fs$outputBgBr, anisotropic = TRUE)
+        # } else {
+        #     collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
+        # }
+
+        # }
     }
 
 
@@ -580,6 +667,64 @@ repeat {
         collector <- collector.temp
     }
 
+
+    # příprava bg pro scénář: seskupení korelovaných rasterů do jedné společné verze generování bg per adjust
+    # ndop.fs$scenario.selected
+    if (ndop.fs$scenario == "bgAll") {
+        collector.subset <- list()
+        collector.rl <- sapply(collector, function(x) x$br)
+        cn.names <- c()
+        for (collector.name in names(collector.rl)) {
+            for (collector.name.adjust in names(collector.rl[[collector.name]])) {
+                cn.names <- c(cn.names, paste0(collector.name, "_", collector.name.adjust))
+            }
+        }
+
+        collector.rs <- stack(collector.rl)
+        names(collector.rs) <- cn.names
+
+        vs.vc <- usdmPB::vifcor(collector.rs, th = 0.7)
+
+        # předběžně uložit
+        saveRDS(vs.vc, paste0(path.tgob, "v_vs.vc_", druh, "_", rep, ".rds"))
+
+        select.bg <- vs.vc@results$Variables
+        pairs <- vs.vc@excludedPairs
+        add.singles <- vs.vc@results$Variables[vs.vc@results$Variables %notin% names(vs.vc@excludedPairs)]
+
+        add.singles.lenght <- length(add.singles)
+        append.singles <- list()
+        if (add.singles.lenght > 0) {
+            append.singles <- rep(NA, add.singles.lenght)
+            names(append.singles) <- add.singles
+
+            append.singles <- as.list(append.singles)
+        }
+
+        pairs.prep <- append(pairs, append.singles)
+
+        pairs.prep <- pairs.prep[sort(names(pairs.prep))]
+
+        pairs.prep.names <- c()
+        for (pairs.prep.name in names(pairs.prep)) {
+            pairs.prep.names <- c(pairs.prep.names, paste(na.omit(c(pairs.prep.name, pairs.prep[[pairs.prep.name]])), collapse = "|"))
+        }
+
+        pairs.prep.names <- sort(pairs.prep.names)
+
+        cntr <- 1
+        for (ss in select.bg) {
+            str.ss <- strsplit(ss, split = "_")[[1]]
+
+            collector.subset[[str.ss[1]]][["bg"]][[str.ss[2]]] <- collector[[str.ss[1]]][["bg"]][[str.ss[2]]]
+            collector.subset[[str.ss[1]]][["name"]][[str.ss[2]]] <- pairs.prep.names[cntr]
+            cntr <- cntr + 1
+        }
+        collector.subset[["un"]] <- collector[["un"]]
+
+        collector <- collector.subset
+    }
+
     gc()
     # run vsech variant BG s ENMeval
     for (id in names(collector)) {
@@ -589,7 +734,7 @@ repeat {
         for (adjust in names(collector[[id]][["bg"]])) {
             print(adjust)
 
-            if (ndop.fs$scenario == "bg") {
+            if (ndop.fs$scenario == "bg" | ndop.fs$scenario == "bgAll") {
                 bg.temp <- as.data.frame(st_coordinates(collector[[id]][["bg"]][[adjust]]))
                 block.bg <- collector[[id]][["bg"]][[adjust]] %>% st_join(bCV.poly)
                 predictors.temp <- predictors
@@ -608,6 +753,11 @@ repeat {
                     print(length(names(predictors.temp)))
                     print(names(predictors.temp))
                 }
+            }
+
+            version2 <- NA
+            if (ndop.fs$scenario == "bgAll") {
+                version2 <- collector[[id]][["name"]][[adjust]]
             }
 
             names(bg.temp) <- ll
@@ -639,6 +789,7 @@ repeat {
 
                         ee.temp@results[["species"]] <- druh
                         ee.temp@results[["version"]] <- id
+                        ee.temp@results[["version2"]] <- version2
                         ee.temp@results[["adjust"]] <- adjust
 
                         temp.t <- ee.temp@results %>% left_join(ei, by = "tune.args")
@@ -684,6 +835,7 @@ repeat {
 
                                 ee.temp@results[["species"]] <- druh
                                 ee.temp@results[["version"]] <- id
+                                ee.temp@results[["version2"]] <- id
                                 ee.temp@results[["adjust"]] <- thinDist
 
                                 temp.t <- ee.temp@results %>% left_join(ei, by = "tune.args")
@@ -706,8 +858,8 @@ repeat {
         }
     }
 
-    saveRDS(e.mx.all, paste0(path.tgob, "6ssos_", druh, "_", rep, ".rds"))
-    saveRDS(out.t, paste0(path.tgob, "t_6ssos_", druh, "_", rep, ".rds"))
+    saveRDS(e.mx.all, paste0(path.tgob, "10ssos_", druh, "_", rep, ".rds"))
+    saveRDS(out.t, paste0(path.tgob, "t_10ssos_", druh, "_", rep, ".rds"))
     gc()
     # } # for DRUH
 }
