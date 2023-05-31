@@ -166,15 +166,21 @@ scenarios.selected <- list(
     "1.sso.w" = "TGOB.sso.w",
     "1.sso.w.3" = "TGOB.sso.w.3",
     #
-    "1.sso.w.dnorm1.mean" = "TGOB.sso.w.dnorm1.mean",
-    "1.sso.w.3.dnorm1.mean" = "TGOB.sso.w.3.dnorm1.mean",
-    "1.sso.w.dnorm1.median" = "TGOB.sso.w.dnorm1.median",
-    "1.sso.w.3.dnorm1.median" = "TGOB.sso.w.3.dnorm1.median",
+    "1.sso.w2" = "TGOB.sso.w2",
+    "1.sso.w2.3" = "TGOB.sso.w2.3",
     #
     "1.sso.w.dnorm2.mean" = "TGOB.sso.w.dnorm2.mean",
     "1.sso.w.3.dnorm2.mean" = "TGOB.sso.w.3.dnorm2.mean",
     "1.sso.w.dnorm2.median" = "TGOB.sso.w.dnorm2.median",
-    "1.sso.w.3.dnorm2.median" = "TGOB.sso.w.3.dnorm2.median"
+    "1.sso.w.3.dnorm2.median" = "TGOB.sso.w.3.dnorm2.median",
+    #
+    "1.sso.w.dnorm3.mean" = "TGOB.sso.w.dnorm3.mean",
+    "1.sso.w.3.dnorm3.mean" = "TGOB.sso.w.3.dnorm3.mean",
+    #
+    "1.sso.w2.dnorm3.mean" = "TGOB.sso.w2.dnorm3.mean",
+    "1.sso.w2.3.dnorm3.mean" = "TGOB.sso.w2.3.dnorm3.mean",
+    "1.sso.w2.dnorm3.median" = "TGOB.sso.w2.dnorm3.median",
+    "1.sso.w2.3.dnorm3.median" = "TGOB.sso.w2.3.dnorm3.median"
 )
 
 
