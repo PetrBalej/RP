@@ -57,10 +57,16 @@ ndop.fs <- list("aucTresholds" = c(0.00, 0.70), "version" = "v1")
 # execution
 ############
 
+se <- function(x) sqrt(var(x) / length(x))
+
 # select null if performs better
 withNull <- FALSE
 # remove thin to get only TGOB derived versions
 withThin <- FALSE
+
+# tgobXostatní
+anyAlt <- FALSE
+
 minReps <- 5
 
 # generování ověření rozdílnosti verzí t.test-em (trvá extrémně dlouho, kešuju)
@@ -360,6 +366,12 @@ tbl.null.test <- tbl.null.ids %>%
   rename(AUC_null = AUC) %>%
   ungroup()
 
+tbl.null.test.cor <- tbl.null.ids %>%
+  group_by(species) %>%
+  slice_max(cor, with_ties = FALSE) %>%
+  dplyr::select(cor, species, id) %>%
+  rename(cor_null = cor) %>%
+  ungroup()
 
 tbl.null.val <- tbl.null.ids %>%
   group_by(species) %>%
@@ -386,6 +398,10 @@ if (withNull) {
     mutate(AUCdiff = ifelse(AUC > AUC_null, AUC - AUC_null, 0)) %>%
     group_by(species, version)
 
+  tbl %<>% left_join(tbl.null.test.cor, by = c("species"), suffix = c("", "__cor")) %>%
+    mutate(cordiff = ifelse(cor > cor_null, cor - cor_null, 0)) %>%
+    group_by(species, version)
+
   tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg")) %>%
     mutate(auc.val.avgdiff = ifelse(auc.val.avg > auc.val.avg_null, auc.val.avg - auc.val.avg_null, 0)) %>%
     group_by(species, version)
@@ -395,6 +411,10 @@ if (withNull) {
   # připojím null (val+test) a spočtu diff
   tbl %<>% left_join(tbl.null.test, by = c("species"), suffix = c("", "__AUC")) %>%
     mutate(AUCdiff = AUC - AUC_null) %>%
+    group_by(species, version)
+
+  tbl %<>% left_join(tbl.null.test.cor, by = c("species"), suffix = c("", "__cor")) %>%
+    mutate(cordiff = cor - cor_null) %>%
     group_by(species, version)
 
   tbl %<>% left_join(tbl.null.val, by = c("species"), suffix = c("", "__auc.avg")) %>%
@@ -449,7 +469,16 @@ tbl.f <- tbl %>%
   group_by(species, version) # final versions selection
 
 selection.f2 <- selection.rename
-k6 <- comb_all(selection.f2, 3) # length(selection.f2)
+combs.n <- 3
+if (anyAlt) {
+  tbl.f %<>% mutate(version = ifelse(version == "TGOB", "TGOB", "anyAlt")) %>%
+    mutate(clr = ifelse(clr == selection.colors[1], selection.colors[1], "#FF00FF")) %>%
+    ungroup()
+  selection.f2 <- c(selection.f2[1], "#FF00FF")
+  combs.n <- 2
+}
+
+k6 <- comb_all(selection.f2, combs.n) # length(selection.f2)
 
 tbl.nn <- tbl.f %>% filter(id %notin% tbl.null.ids.unique) # not null
 tbl.null <- tbl %>% filter(id %in% tbl.null.ids.unique) # null - musím brát z původní tabulky vždy - ikdyž počítám s !withThin
@@ -740,6 +769,23 @@ for (at in ndop.fs$aucTresholds) {
   ### ### ### startA val
   ### ### ###
 
+  temp.g.next <- temp.g
+  temp.g.clrn <- temp.g
+  if (anyAlt) {
+    ## stejný výsledek
+    temp.g.next <- temp.g
+    clrn <- temp.g %>%
+      ungroup() %>%
+      group_by(species) %>%
+      slice_max(auc.val.avgdiff, with_ties = TRUE) %>%
+      group_by(species) %>%
+      summarise(clrn = length(id))
+    clrn %<>% filter(clrn > 1)
+    temp.g %<>% mutate(clr = ifelse(species %in% clrn$species, "#808080", clr))
+    temp.g %<>% mutate(version = ifelse(species %in% clrn$species, "2+", version))
+    temp.g.clrn <- temp.g
+  }
+
   tobs <- ggplot() +
     geom_bar(data = temp.g %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avgdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, auc.val.avgdiff, fill = factor(version)), color = "yellow", size = 0.01) +
     geom_point(data = temp.g %>% ungroup(), mapping = aes(species, auc.val.avgdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21, alpha = 0.90) +
@@ -831,204 +877,209 @@ for (at in ndop.fs$aucTresholds) {
   # páry
   #
   for (cmp in pairs.compare) {
-    temp.g.c <- temp.g
+    if (!anyAlt) {
+      temp.g.c <- temp.g
 
 
-    temp.g.c %<>% filter(version %in% cmp)
+      temp.g.c %<>% filter(version %in% cmp)
 
-    gc()
-    if (at == 0 & verified.generate) {
-      print("liší se výsledné AUC párů verzí (porovnává všechny replikace)? (další metriky???)  [auc.val.avg]")
-      print(cmp[1])
-      tmptbl <- temp.g.c %>%
-        group_by(species) %>%
-        arrange(desc(auc.val.avgdiff)) %>%
-        slice_head(n = 2) %>%
-        dplyr::select(species, version, adjust, tune.args)
+      gc()
+      if (at == 0 & verified.generate) {
+        print("liší se výsledné AUC párů verzí (porovnává všechny replikace)? (další metriky???)  [auc.val.avg]")
+        print(cmp[1])
+        tmptbl <- temp.g.c %>%
+          group_by(species) %>%
+          arrange(desc(auc.val.avgdiff)) %>%
+          slice_head(n = 2) %>%
+          dplyr::select(species, version, adjust, tune.args)
 
-      tmptbl.null <- tbl.null %>%
-        group_by(species) %>%
-        arrange(desc(auc.val.avgdiff)) %>%
-        slice_head(n = 1) %>%
-        dplyr::select(species, version, adjust, tune.args)
+        tmptbl.null <- tbl.null %>%
+          group_by(species) %>%
+          arrange(desc(auc.val.avgdiff)) %>%
+          slice_head(n = 1) %>%
+          dplyr::select(species, version, adjust, tune.args)
 
 
-      for (sp in unique(tmptbl$species)) {
-        print("")
-        print(sp)
+        for (sp in unique(tmptbl$species)) {
+          print("")
+          print(sp)
 
-        #
-        # top2
-        #
-        print("top2:")
-        top2 <- tmptbl %>% filter(species == sp)
+          #
+          # top2
+          #
+          print("top2:")
+          top2 <- tmptbl %>% filter(species == sp)
 
-        # 111
-        #         top2v <- lapply(1:2, function(x) {
-        #           tmp <- list()
-        #           tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
-        #           tmp[["top"]] <- top2[x, ]$version
-        #
-        #           # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
-        #           # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        #           if (nrow(tmp[["t"]]) >= 333) {
-        #             tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$auc.val.avg)$p.value
-        #           } else {
-        #             print(" < 3 replikací !!!")
-        #             tmp[["shapiro.p"]] <- 0
-        #           }
-        #           return(tmp)
-        #         })
+          # 111
+          #         top2v <- lapply(1:2, function(x) {
+          #           tmp <- list()
+          #           tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
+          #           tmp[["top"]] <- top2[x, ]$version
+          #
+          #           # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
+          #           # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          #           if (nrow(tmp[["t"]]) >= 333) {
+          #             tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$auc.val.avg)$p.value
+          #           } else {
+          #             print(" < 3 replikací !!!")
+          #             tmp[["shapiro.p"]] <- 0
+          #           }
+          #           return(tmp)
+          #         })
 
-        top2v.normality <- FALSE # sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
+          top2v.normality <- FALSE # sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
 
-        # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
-        # vartest <- var.test(top2v[[1]][["t"]]$auc.val.avg, top2v[[2]][["t"]]$auc.val.avg)   # p < 0.05 (Variances are not equal)
-        if (top2v.normality) {
-          print("OK (normality)")
-          ttest <- t.test(top2v[[1]][["t"]]$auc.val.avg, top2v[[2]][["t"]]$auc.val.avg, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
-          tmp.top2[[cmp[1]]][[sp]][["val"]] <- ttest$p.value
-          tmp.top2[[cmp[1]]][[sp]][["val.auc1"]] <- mean(top2v[[1]][["t"]]$auc.val.avg)
-          tmp.top2[[cmp[1]]][[sp]][["val.auc2"]] <- mean(top2v[[2]][["t"]]$auc.val.avg)
-          tmp.top2[[cmp[1]]][[sp]][["val.version1"]] <- top2v[[1]][["top"]]
-          tmp.top2[[cmp[1]]][[sp]][["val.version2"]] <- top2v[[2]][["top"]]
-        } else {
-          print("auc nejsou normálně rozložené nebo < 3 replikací, jiný test...")
-          tmp.top2[[cmp[1]]][[sp]][["val"]] <- NA
-          tmp.top2[[cmp[1]]][[sp]][["val.auc1"]] <- NA
-          tmp.top2[[cmp[1]]][[sp]][["val.auc2"]] <- NA
-          tmp.top2[[cmp[1]]][[sp]][["val.version1"]] <- NA
-          tmp.top2[[cmp[1]]][[sp]][["val.version2"]] <- NA
-        }
+          # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
+          # vartest <- var.test(top2v[[1]][["t"]]$auc.val.avg, top2v[[2]][["t"]]$auc.val.avg)   # p < 0.05 (Variances are not equal)
+          if (top2v.normality) {
+            print("OK (normality)")
+            ttest <- t.test(top2v[[1]][["t"]]$auc.val.avg, top2v[[2]][["t"]]$auc.val.avg, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+            tmp.top2[[cmp[1]]][[sp]][["val"]] <- ttest$p.value
+            tmp.top2[[cmp[1]]][[sp]][["val.auc1"]] <- mean(top2v[[1]][["t"]]$auc.val.avg)
+            tmp.top2[[cmp[1]]][[sp]][["val.auc2"]] <- mean(top2v[[2]][["t"]]$auc.val.avg)
+            tmp.top2[[cmp[1]]][[sp]][["val.version1"]] <- top2v[[1]][["top"]]
+            tmp.top2[[cmp[1]]][[sp]][["val.version2"]] <- top2v[[2]][["top"]]
+          } else {
+            print("auc nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+            tmp.top2[[cmp[1]]][[sp]][["val"]] <- NA
+            tmp.top2[[cmp[1]]][[sp]][["val.auc1"]] <- NA
+            tmp.top2[[cmp[1]]][[sp]][["val.auc2"]] <- NA
+            tmp.top2[[cmp[1]]][[sp]][["val.version1"]] <- NA
+            tmp.top2[[cmp[1]]][[sp]][["val.version2"]] <- NA
+          }
 
-        #
-        # top1 vs null
-        #
-        print("top1null:")
-        top1null <- tmptbl.null %>% filter(species == sp)
+          #
+          # top1 vs null
+          #
+          print("top1null:")
+          top1null <- tmptbl.null %>% filter(species == sp)
 
-        tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
+          tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
 
-        if (nrow(tmp.null.t) >= 333) {
-          tmp.null <- shapiro.test(tmp.null.t$auc.val.avg)$p.value
-        } else {
-          print("null < 3 replikací !!!")
-          tmp.null <- 0
-        }
+          if (nrow(tmp.null.t) >= 333) {
+            tmp.null <- shapiro.test(tmp.null.t$auc.val.avg)$p.value
+          } else {
+            print("null < 3 replikací !!!")
+            tmp.null <- 0
+          }
 
-        top1null.normality <- FALSE # sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
+          top1null.normality <- FALSE # sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
 
-        if (top1null.normality) {
-          print("OK (normality)")
-          ttest <- t.test(top2v[[1]][["t"]]$auc.val.avg, tmp.null.t$auc.val.avg, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
-          tmp.top1null[[cmp[1]]][[sp]][["val"]] <- ttest$p.value
-          tmp.top1null[[cmp[1]]][[sp]][["val.auc1"]] <- mean(top2v[[1]][["t"]]$auc.val.avg)
-          tmp.top1null[[cmp[1]]][[sp]][["val.auc2"]] <- mean(tmp.null.t$auc.val.avg)
-          tmp.top1null[[cmp[1]]][[sp]][["val.version1"]] <- top2v[[1]][["top"]]
-          tmp.top1null[[cmp[1]]][[sp]][["val.version2"]] <- "un"
-        } else {
-          print("auc (null a 1) nejsou normálně rozložené nebo < 3 replikací, jiný test...")
-          tmp.top1null[[cmp[1]]][[sp]][["val"]] <- NA
-          tmp.top1null[[cmp[1]]][[sp]][["val.auc1"]] <- NA
-          tmp.top1null[[cmp[1]]][[sp]][["val.auc2"]] <- NA
-          tmp.top1null[[cmp[1]]][[sp]][["val.version1"]] <- NA
-          tmp.top1null[[cmp[1]]][[sp]][["val.version2"]] <- NA
+          if (top1null.normality) {
+            print("OK (normality)")
+            ttest <- t.test(top2v[[1]][["t"]]$auc.val.avg, tmp.null.t$auc.val.avg, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+            tmp.top1null[[cmp[1]]][[sp]][["val"]] <- ttest$p.value
+            tmp.top1null[[cmp[1]]][[sp]][["val.auc1"]] <- mean(top2v[[1]][["t"]]$auc.val.avg)
+            tmp.top1null[[cmp[1]]][[sp]][["val.auc2"]] <- mean(tmp.null.t$auc.val.avg)
+            tmp.top1null[[cmp[1]]][[sp]][["val.version1"]] <- top2v[[1]][["top"]]
+            tmp.top1null[[cmp[1]]][[sp]][["val.version2"]] <- "un"
+          } else {
+            print("auc (null a 1) nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+            tmp.top1null[[cmp[1]]][[sp]][["val"]] <- NA
+            tmp.top1null[[cmp[1]]][[sp]][["val.auc1"]] <- NA
+            tmp.top1null[[cmp[1]]][[sp]][["val.auc2"]] <- NA
+            tmp.top1null[[cmp[1]]][[sp]][["val.version1"]] <- NA
+            tmp.top1null[[cmp[1]]][[sp]][["val.version2"]] <- NA
+          }
         }
       }
+
+      ### ### ###
+      ### ### ### startA val
+      ### ### ###
+
+      tobs <- ggplot() +
+        geom_bar(data = temp.g.c %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avgdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, auc.val.avgdiff, fill = factor(version)), color = "yellow", size = 0.01) +
+        geom_point(data = temp.g.c %>% ungroup(), mapping = aes(species, auc.val.avgdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21, alpha = 0.90) +
+        scale_fill_manual(values = unique(unname(unlist(temp.g.c %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
+        theme_light() +
+        theme(
+          legend.text = element_text(size = 4),
+          text = element_text(size = 6),
+          axis.text.y = element_markdown(),
+          # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
+          panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+          strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
+        )
+
+      tt.null <- sapply(tmp.top1null[[cmp[1]]], function(x) x$val < 0.05)
+      tt <- sapply(tmp.top2[[cmp[1]]], function(x) x$val < 0.05)
+
+      # negativní korekce
+      tt.null.minus <- sapply(tmp.top1null[[cmp[1]]], function(x) is.na(x$val.auc1 < x$val.auc2) | x$val.auc1 < x$val.auc2)
+      # znegovat případné minusové opravy
+      tt.null[tt.null == TRUE & tt.null.minus == TRUE] <- FALSE
+      tt[tt == TRUE & tt.null.minus == TRUE] <- FALSE
+
+      # omezením druhy pro AUC treshold
+      tt.null <- tt.null[names(tt.null) %in% unique(temp.g.c$species)]
+      tt <- tt[names(tt) %in% unique(temp.g.c$species)]
+
+
+      # základní + změna řazení
+      no <- temp.g.c %>%
+        ungroup() %>%
+        group_by(species) %>%
+        slice_max(auc.val.avgdiff, with_ties = FALSE) %>%
+        ungroup() %>%
+        mutate(tt.null = tt.null) %>%
+        mutate(tt = tt) %>%
+        mutate(title = paste0(ifelse(!is.na(tt.null) & tt.null & !is.na(tt) & tt, paste0("***", species, "***"), ifelse(!is.na(tt.null) & tt.null, paste0("**", species, "**"), ifelse(!is.na(tt) & tt, paste0("*", species, "*"), species))), " | ", formatC(auc.val.avg_null, digits = 2, format = "f"), "->", formatC(auc.val.avg, digits = 2, format = "f"))) %>%
+        dplyr::select(title, occs.n, species, auc.val.avgdiff, auc.val.avg, auc.val.avg_null)
+
+      title <- unname(unlist(no$title))
+      title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
+
+      tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+      ggsave(paste0(path.PP.val, "trend-overall-best-species.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
+
+
+      # occs.n
+      no.temp <- no %>%
+        arrange(occs.n)
+      order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+      title <- unname(unlist(no.temp$title))
+      title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
+
+      tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+      ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByOccs.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
+
+      # auc.val.avgdiff
+      no.temp <- no %>%
+        arrange(auc.val.avgdiff)
+      order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+      title <- unname(unlist(no.temp$title))
+      title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
+
+      tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avgdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+      ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByDiff.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
+
+      # auc.val.avg
+      no.temp <- no %>%
+        arrange(auc.val.avg)
+      order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+      title <- unname(unlist(no.temp$title))
+      title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
+
+      tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+      ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAuc.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
+
+      # auc.val.avg_null
+      no.temp <- no %>%
+        arrange(auc.val.avg_null)
+      order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+      title <- unname(unlist(no.temp$title))
+      title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
+
+      tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+      ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAucNull.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
+
+      ### ### ### endB
     }
-
-    ### ### ###
-    ### ### ### startA val
-    ### ### ###
-
-    tobs <- ggplot() +
-      geom_bar(data = temp.g.c %>% ungroup() %>% group_by(species) %>% slice_max(auc.val.avgdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, auc.val.avgdiff, fill = factor(version)), color = "yellow", size = 0.01) +
-      geom_point(data = temp.g.c %>% ungroup(), mapping = aes(species, auc.val.avgdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21, alpha = 0.90) +
-      scale_fill_manual(values = unique(unname(unlist(temp.g.c %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
-      theme_light() +
-      theme(
-        legend.text = element_text(size = 4),
-        text = element_text(size = 6),
-        axis.text.y = element_markdown(),
-        # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
-        panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
-        strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
-      )
-
-    tt.null <- sapply(tmp.top1null[[cmp[1]]], function(x) x$val < 0.05)
-    tt <- sapply(tmp.top2[[cmp[1]]], function(x) x$val < 0.05)
-
-    # negativní korekce
-    tt.null.minus <- sapply(tmp.top1null[[cmp[1]]], function(x) is.na(x$val.auc1 < x$val.auc2) | x$val.auc1 < x$val.auc2)
-    # znegovat případné minusové opravy
-    tt.null[tt.null == TRUE & tt.null.minus == TRUE] <- FALSE
-    tt[tt == TRUE & tt.null.minus == TRUE] <- FALSE
-
-    # omezením druhy pro AUC treshold
-    tt.null <- tt.null[names(tt.null) %in% unique(temp.g.c$species)]
-    tt <- tt[names(tt) %in% unique(temp.g.c$species)]
-
-
-    # základní + změna řazení
-    no <- temp.g.c %>%
-      ungroup() %>%
-      group_by(species) %>%
-      slice_max(auc.val.avgdiff, with_ties = FALSE) %>%
-      ungroup() %>%
-      mutate(tt.null = tt.null) %>%
-      mutate(tt = tt) %>%
-      mutate(title = paste0(ifelse(!is.na(tt.null) & tt.null & !is.na(tt) & tt, paste0("***", species, "***"), ifelse(!is.na(tt.null) & tt.null, paste0("**", species, "**"), ifelse(!is.na(tt) & tt, paste0("*", species, "*"), species))), " | ", formatC(auc.val.avg_null, digits = 2, format = "f"), "->", formatC(auc.val.avg, digits = 2, format = "f"))) %>%
-      dplyr::select(title, occs.n, species, auc.val.avgdiff, auc.val.avg, auc.val.avg_null)
-
-    title <- unname(unlist(no$title))
-    title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
-
-    tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.val, "trend-overall-best-species.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
-
-
-    # occs.n
-    no.temp <- no %>%
-      arrange(occs.n)
-    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
-    title <- unname(unlist(no.temp$title))
-    title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
-
-    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByOccs.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
-
-    # auc.val.avgdiff
-    no.temp <- no %>%
-      arrange(auc.val.avgdiff)
-    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
-    title <- unname(unlist(no.temp$title))
-    title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
-
-    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avgdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByDiff.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
-
-    # auc.val.avg
-    no.temp <- no %>%
-      arrange(auc.val.avg)
-    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
-    title <- unname(unlist(no.temp$title))
-    title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
-
-    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAuc.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
-
-    # auc.val.avg_null
-    no.temp <- no %>%
-      arrange(auc.val.avg_null)
-    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
-    title <- unname(unlist(no.temp$title))
-    title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
-
-    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAucNull.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
-
-    ### ### ### endB
   }
+
+
+  temp.g <- temp.g.next
 
 
   # a) vše
@@ -1049,6 +1100,8 @@ for (at in ndop.fs$aucTresholds) {
 
 
   ### ### ### start
+  temp.g <- temp.g.clrn
+
 
   ## nesmím  nechávat thin verzi nové occs.n pořadí!! - přepsat jinou verzí - obecně všude?
 
@@ -1088,7 +1141,7 @@ for (at in ndop.fs$aucTresholds) {
 
   ### ### ### end
 
-
+  temp.g <- temp.g.next
 
 
 
@@ -1281,6 +1334,59 @@ for (at in ndop.fs$aucTresholds) {
   # kss AUCdiff
   ################################################################################################################################################################################
 
+  #
+  # se.plot
+  #
+
+  temp.g.tm <- list()
+  temp.g.tm[["AUC"]] <- tbl.nn %>%
+    ungroup() %>%
+    group_by(species, version) %>%
+    slice_max(AUCdiff, with_ties = FALSE) # %>% filter(AUC >= at) # nedělám, neznám odpovídající treshold pro cor...
+
+  temp.g.tm[["cor"]] <- tbl.nn %>%
+    ungroup() %>%
+    group_by(species, version) %>%
+    slice_max(cordiff, with_ties = FALSE)
+
+  temp.g.tm.join <- list()
+
+  temp.g.tm.join[["AUC"]] <- temp.g.tm[["AUC"]] %>%
+    ungroup() %>%
+    group_by(version) %>%
+    summarise(aucMean = mean(AUC), aucSd = se(AUC), clr = first(clr))
+  temp.g.tm.join[["cor"]] <- temp.g.tm[["cor"]] %>%
+    ungroup() %>%
+    group_by(version) %>%
+    summarise(corMean = mean(cor), corSd = se(cor), clr = first(clr))
+
+  temp.g.tm.joined <- temp.g.tm.join[["AUC"]] %>% left_join(temp.g.tm.join[["cor"]], by = "version")
+
+
+  se.plot <- ggplot(temp.g.tm.joined, aes(x = aucMean, y = corMean, color = version)) +
+    geom_point(shape = 16, alpha = 0.90) +
+    scale_color_manual(values = temp.g.tm.joined$clr.x) +
+    theme_light() +
+    # geom_smooth(method=lm)+
+    geom_errorbarh(aes(
+      xmin = aucMean - aucSd,
+      xmax = aucMean + aucSd
+    ),
+    height = 0.0, size = 0.2, alpha = 0.90
+    ) +
+    geom_errorbar(aes(
+      ymin = corMean - corSd,
+      ymax = corMean + corSd
+    ),
+    width = 0.0, size = 0.2, alpha = 0.90
+    ) +
+    theme(
+      legend.text = element_text(size = 3),
+      text = element_text(size = 4)
+    )
+
+  ggsave(paste0(path.PP.test, "se.plot.test.", as.character(at), ".png"), width = 1500, height = 800, units = "px")
+
   temp.g <- tbl.nn %>%
     ungroup() %>%
     group_by(species, version) %>%
@@ -1401,6 +1507,23 @@ for (at in ndop.fs$aucTresholds) {
   ### ### ### startA TEST
   ### ### ###
 
+  temp.g.next <- temp.g
+  temp.g.clrn <- temp.g
+  if (anyAlt) {
+    temp.g.next <- temp.g
+    clrn <- temp.g %>%
+      ungroup() %>%
+      group_by(species) %>%
+      slice_max(AUCdiff, with_ties = TRUE) %>%
+      group_by(species) %>%
+      summarise(clrn = length(id))
+    clrn %<>% filter(clrn > 1)
+    temp.g %<>% mutate(clr = ifelse(species %in% clrn$species, "#808080", clr))
+    temp.g %<>% mutate(version = ifelse(species %in% clrn$species, "2+", version))
+    temp.g.clrn <- temp.g
+  }
+
+
   tobs <- ggplot() +
     geom_bar(data = temp.g %>% ungroup() %>% group_by(species) %>% slice_max(AUCdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, AUCdiff, fill = factor(version)), color = "yellow", size = 0.01) +
     geom_point(data = temp.g %>% ungroup(), mapping = aes(species, AUCdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21, alpha = 0.90) +
@@ -1494,204 +1617,206 @@ for (at in ndop.fs$aucTresholds) {
   # páry
   #
   for (cmp in pairs.compare) {
-    temp.g.c <- temp.g
+    if (!anyAlt) {
+      temp.g.c <- temp.g
 
 
-    temp.g.c %<>% filter(version %in% cmp)
+      temp.g.c %<>% filter(version %in% cmp)
 
-    gc()
-    if (at == 0 & verified.generate) {
-      print("liší se výsledné AUC párů verzí (porovnává všechny replikace)? (další metriky???)  [AUC]")
-      print(cmp[1])
-      tmptbl <- temp.g.c %>%
-        group_by(species) %>%
-        arrange(desc(AUCdiff)) %>%
-        slice_head(n = 2) %>%
-        dplyr::select(species, version, adjust, tune.args)
+      gc()
+      if (at == 0 & verified.generate) {
+        print("liší se výsledné AUC párů verzí (porovnává všechny replikace)? (další metriky???)  [AUC]")
+        print(cmp[1])
+        tmptbl <- temp.g.c %>%
+          group_by(species) %>%
+          arrange(desc(AUCdiff)) %>%
+          slice_head(n = 2) %>%
+          dplyr::select(species, version, adjust, tune.args)
 
-      tmptbl.null <- tbl.null %>%
-        group_by(species) %>%
-        arrange(desc(AUCdiff)) %>%
-        slice_head(n = 1) %>%
-        dplyr::select(species, version, adjust, tune.args)
+        tmptbl.null <- tbl.null %>%
+          group_by(species) %>%
+          arrange(desc(AUCdiff)) %>%
+          slice_head(n = 1) %>%
+          dplyr::select(species, version, adjust, tune.args)
 
 
-      for (sp in unique(tmptbl$species)) {
-        print("")
-        print(sp)
+        for (sp in unique(tmptbl$species)) {
+          print("")
+          print(sp)
 
-        #
-        # top2
-        #
-        print("top2:")
-        top2 <- tmptbl %>% filter(species == sp)
+          #
+          # top2
+          #
+          print("top2:")
+          top2 <- tmptbl %>% filter(species == sp)
 
-        # 111
-        # top2v <- lapply(1:2, function(x) {
-        #   tmp <- list()
-        #   tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
-        #   tmp[["top"]] <- top2[x, ]$version
-        #
-        #   # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
-        #   # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        #   if (nrow(tmp[["t"]]) >= 333) {
-        #     tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$AUC)$p.value
-        #   } else {
-        #     print(" < 3 replikací !!!")
-        #     tmp[["shapiro.p"]] <- 0
-        #   }
-        #   return(tmp)
-        # })
+          # 111
+          # top2v <- lapply(1:2, function(x) {
+          #   tmp <- list()
+          #   tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
+          #   tmp[["top"]] <- top2[x, ]$version
+          #
+          #   # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
+          #   # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          #   if (nrow(tmp[["t"]]) >= 333) {
+          #     tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$AUC)$p.value
+          #   } else {
+          #     print(" < 3 replikací !!!")
+          #     tmp[["shapiro.p"]] <- 0
+          #   }
+          #   return(tmp)
+          # })
 
-        top2v.normality <- FALSE # sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
+          top2v.normality <- FALSE # sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
 
-        # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
-        # vartest <- var.test(top2v[[1]][["t"]]$AUC, top2v[[2]][["t"]]$AUC)   # p < 0.05 (Variances are not equal)
-        if (top2v.normality) {
-          print("OK (normality)")
-          ttest <- t.test(top2v[[1]][["t"]]$AUC, top2v[[2]][["t"]]$AUC, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
-          tmp.top2[[cmp[1]]][[sp]][["test"]] <- ttest$p.value
-          tmp.top2[[cmp[1]]][[sp]][["test.auc1"]] <- mean(top2v[[1]][["t"]]$AUC)
-          tmp.top2[[cmp[1]]][[sp]][["test.auc2"]] <- mean(top2v[[2]][["t"]]$AUC)
-          tmp.top2[[cmp[1]]][[sp]][["test.version1"]] <- top2v[[1]][["top"]]
-          tmp.top2[[cmp[1]]][[sp]][["test.version2"]] <- top2v[[2]][["top"]]
-        } else {
-          print("auc nejsou normálně rozložené nebo < 3 replikací, jiný test...")
-          tmp.top2[[cmp[1]]][[sp]][["test"]] <- NA
-          tmp.top2[[cmp[1]]][[sp]][["test.auc1"]] <- NA
-          tmp.top2[[cmp[1]]][[sp]][["test.auc2"]] <- NA
-          tmp.top2[[cmp[1]]][[sp]][["test.version1"]] <- NA
-          tmp.top2[[cmp[1]]][[sp]][["test.version2"]] <- NA
-        }
+          # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
+          # vartest <- var.test(top2v[[1]][["t"]]$AUC, top2v[[2]][["t"]]$AUC)   # p < 0.05 (Variances are not equal)
+          if (top2v.normality) {
+            print("OK (normality)")
+            ttest <- t.test(top2v[[1]][["t"]]$AUC, top2v[[2]][["t"]]$AUC, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+            tmp.top2[[cmp[1]]][[sp]][["test"]] <- ttest$p.value
+            tmp.top2[[cmp[1]]][[sp]][["test.auc1"]] <- mean(top2v[[1]][["t"]]$AUC)
+            tmp.top2[[cmp[1]]][[sp]][["test.auc2"]] <- mean(top2v[[2]][["t"]]$AUC)
+            tmp.top2[[cmp[1]]][[sp]][["test.version1"]] <- top2v[[1]][["top"]]
+            tmp.top2[[cmp[1]]][[sp]][["test.version2"]] <- top2v[[2]][["top"]]
+          } else {
+            print("auc nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+            tmp.top2[[cmp[1]]][[sp]][["test"]] <- NA
+            tmp.top2[[cmp[1]]][[sp]][["test.auc1"]] <- NA
+            tmp.top2[[cmp[1]]][[sp]][["test.auc2"]] <- NA
+            tmp.top2[[cmp[1]]][[sp]][["test.version1"]] <- NA
+            tmp.top2[[cmp[1]]][[sp]][["test.version2"]] <- NA
+          }
 
-        #
-        # top1 vs null
-        #
-        print("top1null:")
-        top1null <- tmptbl.null %>% filter(species == sp)
+          #
+          # top1 vs null
+          #
+          print("top1null:")
+          top1null <- tmptbl.null %>% filter(species == sp)
 
-        tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
+          tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
 
-        if (nrow(tmp.null.t) >= 333) {
-          tmp.null <- shapiro.test(tmp.null.t$AUC)$p.value
-        } else {
-          print("null < 3 replikací !!!")
-          tmp.null <- 0
-        }
+          if (nrow(tmp.null.t) >= 333) {
+            tmp.null <- shapiro.test(tmp.null.t$AUC)$p.value
+          } else {
+            print("null < 3 replikací !!!")
+            tmp.null <- 0
+          }
 
-        top1null.normality <- FALSE # sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
+          top1null.normality <- FALSE # sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
 
-        if (top1null.normality) {
-          print("OK (normality)")
-          ttest <- t.test(top2v[[1]][["t"]]$AUC, tmp.null.t$AUC, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
-          tmp.top1null[[cmp[1]]][[sp]][["test"]] <- ttest$p.value
-          tmp.top1null[[cmp[1]]][[sp]][["test.auc1"]] <- mean(top2v[[1]][["t"]]$AUC)
-          tmp.top1null[[cmp[1]]][[sp]][["test.auc2"]] <- mean(tmp.null.t$AUC)
-          tmp.top1null[[cmp[1]]][[sp]][["test.version1"]] <- top2v[[1]][["top"]]
-          tmp.top1null[[cmp[1]]][[sp]][["test.version2"]] <- "un"
-        } else {
-          print("auc (null a 1) nejsou normálně rozložené nebo < 3 replikací, jiný test...")
-          tmp.top1null[[cmp[1]]][[sp]][["test"]] <- NA
-          tmp.top1null[[cmp[1]]][[sp]][["test.auc1"]] <- NA
-          tmp.top1null[[cmp[1]]][[sp]][["test.auc2"]] <- NA
-          tmp.top1null[[cmp[1]]][[sp]][["test.version1"]] <- NA
-          tmp.top1null[[cmp[1]]][[sp]][["test.version2"]] <- NA
+          if (top1null.normality) {
+            print("OK (normality)")
+            ttest <- t.test(top2v[[1]][["t"]]$AUC, tmp.null.t$AUC, alternative = "two.sided", paired = FALSE, var.equal = FALSE)
+            tmp.top1null[[cmp[1]]][[sp]][["test"]] <- ttest$p.value
+            tmp.top1null[[cmp[1]]][[sp]][["test.auc1"]] <- mean(top2v[[1]][["t"]]$AUC)
+            tmp.top1null[[cmp[1]]][[sp]][["test.auc2"]] <- mean(tmp.null.t$AUC)
+            tmp.top1null[[cmp[1]]][[sp]][["test.version1"]] <- top2v[[1]][["top"]]
+            tmp.top1null[[cmp[1]]][[sp]][["test.version2"]] <- "un"
+          } else {
+            print("auc (null a 1) nejsou normálně rozložené nebo < 3 replikací, jiný test...")
+            tmp.top1null[[cmp[1]]][[sp]][["test"]] <- NA
+            tmp.top1null[[cmp[1]]][[sp]][["test.auc1"]] <- NA
+            tmp.top1null[[cmp[1]]][[sp]][["test.auc2"]] <- NA
+            tmp.top1null[[cmp[1]]][[sp]][["test.version1"]] <- NA
+            tmp.top1null[[cmp[1]]][[sp]][["test.version2"]] <- NA
+          }
         }
       }
+
+      ### ### ###
+      ### ### ### startA TEST
+      ### ### ###
+
+      tobs <- ggplot() +
+        geom_bar(data = temp.g.c %>% ungroup() %>% group_by(species) %>% slice_max(AUCdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, AUCdiff, fill = factor(version)), color = "yellow", size = 0.01) +
+        geom_point(data = temp.g.c %>% ungroup(), mapping = aes(species, AUCdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21, alpha = 0.90) +
+        scale_fill_manual(values = unique(unname(unlist(temp.g.c %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
+        theme_light() +
+        theme(
+          legend.text = element_text(size = 4),
+          text = element_text(size = 6),
+          axis.text.y = element_markdown(),
+          # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
+          panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
+          strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
+        )
+
+      tt.null <- sapply(tmp.top1null[[cmp[1]]], function(x) x$test < 0.05)
+      tt <- sapply(tmp.top2[[cmp[1]]], function(x) x$test < 0.05)
+
+      # negativní korekce
+      tt.null.minus <- sapply(tmp.top1null[[cmp[1]]], function(x) is.na(x$test.auc1 < x$test.auc2) | x$test.auc1 < x$test.auc2)
+      # znegovat případné minusové opravy
+      tt.null[tt.null == TRUE & tt.null.minus == TRUE] <- FALSE
+      tt[tt == TRUE & tt.null.minus == TRUE] <- FALSE
+
+      # omezením druhy pro AUC treshold
+      tt.null <- tt.null[names(tt.null) %in% unique(temp.g.c$species)]
+      tt <- tt[names(tt) %in% unique(temp.g.c$species)]
+
+      # základní + změna řazení
+      no <- temp.g.c %>%
+        ungroup() %>%
+        group_by(species) %>%
+        slice_max(AUCdiff, with_ties = FALSE) %>%
+        ungroup() %>%
+        mutate(tt.null = tt.null) %>%
+        mutate(tt = tt) %>%
+        mutate(title = paste0(ifelse(!is.na(tt.null) & tt.null & !is.na(tt) & tt, paste0("***", species, "***"), ifelse(!is.na(tt.null) & tt.null, paste0("**", species, "**"), ifelse(!is.na(tt) & tt, paste0("*", species, "*"), species))), " | ", formatC(AUC_null, digits = 2, format = "f"), "->", formatC(AUC, digits = 2, format = "f"))) %>%
+        dplyr::select(title, occs.n, species, AUCdiff, AUC, AUC_null)
+
+      title <- unname(unlist(no$title))
+      title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
+
+      tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+      ggsave(paste0(path.PP.test, "trend-overall-best-species.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
+
+      # occs.n
+      no.temp <- no %>%
+        arrange(occs.n)
+      order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+      title <- unname(unlist(no.temp$title))
+      title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
+
+      tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+      ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByOccs.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
+
+      # AUCdiff
+      no.temp <- no %>%
+        arrange(AUCdiff)
+      order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+      title <- unname(unlist(no.temp$title))
+      title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
+
+      tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUCdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+      ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
+
+      # AUC
+      no.temp <- no %>%
+        arrange(AUC)
+      order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+      title <- unname(unlist(no.temp$title))
+      title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
+
+      tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+      ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAuc.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
+
+      # AUC_null
+      no.temp <- no %>%
+        arrange(AUC_null)
+      order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
+      title <- unname(unlist(no.temp$title))
+      title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
+
+      tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
+      ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAucNull.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
+
+      ### ### ### endB
     }
-
-    ### ### ###
-    ### ### ### startA TEST
-    ### ### ###
-
-    tobs <- ggplot() +
-      geom_bar(data = temp.g.c %>% ungroup() %>% group_by(species) %>% slice_max(AUCdiff, with_ties = FALSE), stat = "identity", mapping = aes(species, AUCdiff, fill = factor(version)), color = "yellow", size = 0.01) +
-      geom_point(data = temp.g.c %>% ungroup(), mapping = aes(species, AUCdiff, fill = factor(version)), size = 1, stroke = 0.1, color = "yellow", shape = 21, alpha = 0.90) +
-      scale_fill_manual(values = unique(unname(unlist(temp.g.c %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
-      theme_light() +
-      theme(
-        legend.text = element_text(size = 4),
-        text = element_text(size = 6),
-        axis.text.y = element_markdown(),
-        # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
-        panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
-        strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
-      )
-
-    tt.null <- sapply(tmp.top1null[[cmp[1]]], function(x) x$test < 0.05)
-    tt <- sapply(tmp.top2[[cmp[1]]], function(x) x$test < 0.05)
-
-    # negativní korekce
-    tt.null.minus <- sapply(tmp.top1null[[cmp[1]]], function(x) is.na(x$test.auc1 < x$test.auc2) | x$test.auc1 < x$test.auc2)
-    # znegovat případné minusové opravy
-    tt.null[tt.null == TRUE & tt.null.minus == TRUE] <- FALSE
-    tt[tt == TRUE & tt.null.minus == TRUE] <- FALSE
-
-    # omezením druhy pro AUC treshold
-    tt.null <- tt.null[names(tt.null) %in% unique(temp.g.c$species)]
-    tt <- tt[names(tt) %in% unique(temp.g.c$species)]
-
-    # základní + změna řazení
-    no <- temp.g.c %>%
-      ungroup() %>%
-      group_by(species) %>%
-      slice_max(AUCdiff, with_ties = FALSE) %>%
-      ungroup() %>%
-      mutate(tt.null = tt.null) %>%
-      mutate(tt = tt) %>%
-      mutate(title = paste0(ifelse(!is.na(tt.null) & tt.null & !is.na(tt) & tt, paste0("***", species, "***"), ifelse(!is.na(tt.null) & tt.null, paste0("**", species, "**"), ifelse(!is.na(tt) & tt, paste0("*", species, "*"), species))), " | ", formatC(AUC_null, digits = 2, format = "f"), "->", formatC(AUC, digits = 2, format = "f"))) %>%
-      dplyr::select(title, occs.n, species, AUCdiff, AUC, AUC_null)
-
-    title <- unname(unlist(no$title))
-    title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
-
-    tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.test, "trend-overall-best-species.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
-
-    # occs.n
-    no.temp <- no %>%
-      arrange(occs.n)
-    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
-    title <- unname(unlist(no.temp$title))
-    title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
-
-    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByOccs.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
-
-    # AUCdiff
-    no.temp <- no %>%
-      arrange(AUCdiff)
-    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
-    title <- unname(unlist(no.temp$title))
-    title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
-
-    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUCdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
-
-    # AUC
-    no.temp <- no %>%
-      arrange(AUC)
-    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
-    title <- unname(unlist(no.temp$title))
-    title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
-
-    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAuc.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
-
-    # AUC_null
-    no.temp <- no %>%
-      arrange(AUC_null)
-    order.new <- unname(unlist(no.temp %>% dplyr::select(species)))
-    title <- unname(unlist(no.temp$title))
-    title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
-
-    tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAucNull.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
-
-    ### ### ### endB
   }
 
-
+  temp.g <- temp.g.next
   # a) vše
   ggplot(temp.g %>% ungroup(), aes(occs.n, AUCdiff)) +
     geom_point(aes(colour = factor(version)), size = 0.1) +
@@ -1710,6 +1835,7 @@ for (at in ndop.fs$aucTresholds) {
 
   ### ### ### start
 
+  temp.g <- temp.g.clrn
   ## nesmím  nechávat thin verzi nové occs.n pořadí!! - přepsat jinou verzí - obecně všude?
 
   # a) vše - OVERALL
@@ -1751,6 +1877,7 @@ for (at in ndop.fs$aucTresholds) {
   ### ### ### end
 
 
+  temp.g <- temp.g.next
 
 
 
