@@ -61,7 +61,7 @@ source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.ndop <- paste0(path.prep, "ndop/") # path.wd.prep.ndop
 path.lsd <- paste0(path.prep, "lsd/") # path.wd.prep.ndop
 path.tgob <- paste0(path.prep, "ndopTGOB/") # path.wd.prep.ndop
-
+path.tgob.tgbg <- paste0(path.prep, "ndopTGOBtgbg/") # path.wd.prep.ndop
 
 
 ############
@@ -156,6 +156,17 @@ scenarios.selected <- list(
     "3" = "TO.w",
     "4" = "TS.AO.w",
     "5" = "TO.AO.w",
+
+    "6" = "TGOB.sso",
+    "7" = "TS.sso",
+    "8" = "TO.sso",
+    "9" = "TS.AO.sso",
+    "10" = "TO.AO.sso",
+
+    "11" = "TS.w.sso",
+    "12" = "TO.w.sso",
+    "13" = "TS.AO.w.sso",
+    "14" = "TO.AO.w.sso",
     #
     # "1.sso" = "TGOB.sso",
     # "2.sso" = "TS.w.sso",
@@ -186,7 +197,7 @@ scenarios.selected <- list(
 
 ndop.fs <- list(
     "adjusts" = c(0.1, 1, 2, 3),
-    "tuneArgs" = list(fc = c("L", "LQ", "LQH"), rm = c(0.5, 1, 2, 3, 4)), # , "H", "LQH", "LQHP"
+    "tuneArgs" = list(fc = c("L", "LQ", "LQP", "LQH", "LQHP"), rm = c(0.5, 1, 2, 3, 4)), # , "H", "LQH", "LQHP"
     "bgRatio" = 1 / 10,
     "bg" = 1000,
     "speciesPerGroup" = 2, "speciesOccMin" = 30,
@@ -197,7 +208,7 @@ ndop.fs <- list(
     "bgRaster" = FALSE,
     "versionNames" = vn, "versionSmooting" = vf,
     "outputBgBr" = c("bg", "br"), # c("bg", "br")
-    "scenario" = "bgAll", # "bg", "br", "brAll", "bgAll"
+    "scenario" = "bg", # "bg", "br", "brAll", "bgAll"
     "scenarios" = scenarios.selected
 )
 
@@ -250,26 +261,44 @@ evalIndep <- function(m, lsd.temp) {
 
 # kešovat
 fn <- paste0(path.tgob, "tgobV.rds")
-if (file.exists(fn)) {
-    print("načítám existující tgobV.rds")
-    # tgobV <- readRDS(fn)
+# if (file.exists(fn)) {
+#     print("načítám existující tgobV.rds")
+#     # tgobV <- readRDS(fn)
+#
+#     # # dočasně, nepoužívám AO - odstranit, ať to nežere místo
+#     # tgbg.names  <-  names(tgobV$p)
+#     # tgobV$p %<>% dplyr::select(tgbg.names[!str_detect(tgbg.names, "\\.AO")])
+#     # tgbg.names  <-  names(tgobV$p)
+#     # tgobV$p %<>% dplyr::select(tgbg.names[!str_detect(tgbg.names, "sso_")])
+#     # saveRDS(tgobV, paste0(path.tgob, "tgobV2.rds"))
+#     tgobV <- readRDS("D:/PersonalWork/Balej/v2/RP/dataPrep/ndopTGOB/tgobV2.rds")
+# } else {
+#     print("generuju nový tgobV.rds")
+#     tgobV <- tgbg::tgobVersions(ndopP, predictors[[1]], species = "DRUH", observers = "AUTOR", species.select = lsd.pa.min$TaxonNameLAT)
+#     saveRDS(tgobV, fn)
+# }
 
-    # # dočasně, nepoužívám AO - odstranit, ať to nežere místo
-    # tgbg.names  <-  names(tgobV$p)
-    # tgobV$p %<>% dplyr::select(tgbg.names[!str_detect(tgbg.names, "\\.AO")])
-    # tgbg.names  <-  names(tgobV$p)
-    # tgobV$p %<>% dplyr::select(tgbg.names[!str_detect(tgbg.names, "sso_")])
-    # saveRDS(tgobV, paste0(path.tgob, "tgobV2.rds"))
-    tgobV <- readRDS("D:/PersonalWork/Balej/v2/RP/dataPrep/ndopTGOB/tgobV2.rds")
-} else {
-    print("generuju nový tgobV.rds")
-    tgobV <- tgbg::tgobVersions(ndopP, predictors[[1]], species = "DRUH", observers = "AUTOR", species.select = lsd.pa.min$TaxonNameLAT)
-    saveRDS(tgobV, fn)
-}
+
+#  # rozdělím per species tgobV - optimalizace
+# cnames <- names(tgobV$p)
+# for(sp in unique(tgobV$p$DRUH)){ # unique(lsd.pa.min$TaxonNameLAT)
+#
+#        cnames.c <- c(cnames[str_detect(cnames, paste0(sp, "$"))], "DRUH", "geometry", "nc_TO.w", "nc_TS.w", "nc_TO", "nc_TS") # paste0("nc_sso_", sp)
+#
+#        # !!sym(cnames.c))
+# #Please use `all_of()` or `any_of()` instead. - namísto přímého vstupu text řetezců...
+# saveRDS(tgobV$p  %>% dplyr::select(cnames.c), paste0(path.tgob.tgbg, sp,".rds"))
+#
+# }
+
+
+
 
 prefix <- "nc_"
-cn <- names(tgobV$p)
-cn_prefix <- cn[str_detect(cn, paste0("^", prefix))]
+
+# # nepotřebuji při použití výše
+# cn <- names(tgobV$p)
+# cn_prefix <- cn[str_detect(cn, paste0("^", prefix))]
 
 ndop.stat.res.sp.selected <- ndop.stat.res.sp %>%
     filter(DRUH %in% unique(lsd.pa.min$TaxonNameLAT)) %>%
@@ -463,26 +492,48 @@ repeat {
     # základní verze backgroundů
     #
 
-    # TGOB ssos
-    ssos.sp <- cn_prefix[str_detect(cn_prefix, paste0(druh, "$"))]
+    # # TGOB ssos
+    # ssos.sp <- cn_prefix[str_detect(cn_prefix, paste0(druh, "$"))]
+    #
+    # versions.base.puv <- c("TGOB", "TO", "TS", "TO.w", "TS.w")
+    # versions.base <- c("TGOB", "TO.w", "TS.w")
+    versions.base <- c("TGOB")
+    # ao.sp <- ssos.sp[!str_detect(ssos.sp, "sso_")]
+    # ao.sp.puv <- gsub(prefix, "", ao.sp)
+    # ao.sp <- c()
+    # ssos.w <- ssos.sp[str_detect(ssos.sp, "sso\\.w")]
+    # ssos.w <- gsub(prefix, "", ssos.w)
+    #
+    # ssos.sp <- ssos.sp[str_detect(ssos.sp, "sso_")]
+    # # ssos.sp <- gsub(prefix, "", ssos.sp)
 
-    versions.base.puv <- c("TGOB", "TO", "TS", "TO.w", "TS.w")
-    versions.base <- c("TGOB", "TO.w", "TS.w")
-    ao.sp <- ssos.sp[!str_detect(ssos.sp, "sso_")]
-    ao.sp.puv <- gsub(prefix, "", ao.sp)
-    ao.sp <- c()
-    ssos.w <- ssos.sp[str_detect(ssos.sp, "sso\\.w")]
-    ssos.w <- gsub(prefix, "", ssos.w)
 
-    ssos.sp <- ssos.sp[str_detect(ssos.sp, "sso_")]
-    # ssos.sp <- gsub(prefix, "", ssos.sp)
 
-    for (vn in c(versions.base, ao.sp, ssos.w)) {
+
+    tgobV <- list()
+    tgobV$p <- readRDS(paste0(path.tgob.tgbg, druh, ".rds"))
+    tgobVnames <- names(tgobV$p)
+
+    #
+    for (vn in c(versions.base, tgobVnames[str_detect(tgobVnames, "\\.w")])) { # c(versions.base, ao.sp, ssos.w)
+        print("----------------------------------------------------------------------------------")
+        print("----------------------------------------------------------------------------------")
         print("----------------------------------------------------------------------------------")
         print(vn)
-        vns <- strsplit(vn, "_")[[1]][1] # odstraním případnou příponu s druhem
+
+        if (vn == "TGOB" | vn == "TS" | vn == "TO" | vn == "TS.AO" | vn == "TO.AO") {
+            vns <- vn
+        } else {
+            vns <- strsplit(vn, "_")[[1]][2] # odstraním případnou příponu s druhem -- posun na 2
+        }
         print(vns)
+
+        print("----------------------------------------------------------------------------------")
+        print("----------------------------------------------------------------------------------")
+        print("----------------------------------------------------------------------------------")
+
         p.temp <- NA
+
 
         print("odstraním focus species (pro generování bias rasterů) - vede k overprediction") # zrušeno (teď pro bg scénář)
         print(druh)
@@ -495,20 +546,30 @@ repeat {
                 dplyr::select(geometry)
             # zkresluju podle druhu
             p.temp.bss <- tgobV$p %>%
-                filter(DRUH == druh) %>%
-                dplyr::select(geometry)
+                filter(DRUH == druh)
         } else {
             if (str_detect(vn, "\\.w")) {
+
                 # beru všechny Top, ale musím odstranit NA, bez vah
                 p.temp <- tgobV$p %>%
                     # filter(DRUH != druh) %>%
-                    filter(!is.na(!!sym(paste0(prefix, vn)))) %>%
-                    dplyr::select(geometry, !!sym(paste0(prefix, vn)))
+                    filter(!is.na(!!sym(paste0(vn))))
             } else {
-                p.temp <- tgobV$p %>%
-                    # filter(DRUH != druh) %>%
-                    filter(!!sym(paste0(prefix, vn)) == 1) %>%
-                    dplyr::select(geometry)
+                if (vn == "TS" | vn == "TO") {
+                    p.temp <- tgobV$p %>%
+                        # filter(DRUH != druh) %>%
+                        filter(!!sym(paste0(prefix, vn)) == 1)
+                } else {
+                    if (vn == "TS.AO" | vn == "TO.AO") {
+                        p.temp <- tgobV$p %>%
+                            # filter(DRUH != druh) %>%
+                            filter(!!sym(paste0(prefix, vn, "_", druh)) == 1)
+                    } else {
+                        p.temp <- tgobV$p %>%
+                            # filter(DRUH != druh) %>%
+                            filter(!!sym(paste0(vn)) == 1)
+                    }
+                }
             }
         }
 
@@ -518,15 +579,71 @@ repeat {
         }
 
         if (str_detect(vn, "\\.w")) {
-            collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(prefix, vn)]], output = ndop.fs$outputBgBr, anisotropic = TRUE)
+            collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp[[paste0(vn)]], output = ndop.fs$outputBgBr, anisotropic = TRUE)
+            if (vns == "TS.w" | vns == "TO.w" | vns == "TS.AO.w" | vns == "TO.AO.w") {
+                # extra sso zde
+                print("___________________________________________________________________________________________________________________________________________________________________")
+                print("extra sso zde")
+                print(vns)
+                print(vn)
+                print(paste0(prefix, "sso_", druh))
+                print(paste0(vns, ".sso"))
+                print("___________________________________________________________________________________________________________________________________________________________________")
+
+                p.temp.temp <- p.temp %>% filter(!!sym(paste0(prefix, "sso_", druh)) == 1)
+
+                collector[[paste0(vns, ".sso")]] <- tgbg::bg(p.temp.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, weights = p.temp.temp[[paste0(vn)]], output = ndop.fs$outputBgBr, anisotropic = TRUE)
+
+                # + zkombinovat i w druhu a w sso???? TS.w.sso.w?
+            }
         } else {
-            collector[[vns]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
+            collector[[vns]] <- tgbg::bg(p.temp %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
 
             if (vn == "TGOB") {
                 # zkresluju podle druhu
-                collector[[paste0(vns, ".bss")]] <- tgbg::bg(p.temp.bss, predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
+                collector[[paste0(vns, ".bss")]] <- tgbg::bg(p.temp.bss %>% dplyr::select(geometry), predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
             }
         }
+
+
+        #
+        # sso
+        #
+        if (vn == "TGOB" | vn == "TS" | vn == "TO" | vn == "TS.AO" | vn == "TO.AO") {
+            #### # základní čisté nevážené sso druhově nespecifické
+            if (vn == "TGOB") {
+                p.temp <- tgobV$p %>%
+                    # filter(DRUH != druh) %>%
+
+                    filter(!!sym(paste0(prefix, "sso_", druh)) == 1) %>%
+                    dplyr::select(geometry)
+            }
+
+            if (vn == "TS" | vn == "TO") {
+                p.temp <- tgobV$p %>%
+                    # filter(DRUH != druh) %>%
+                    filter(!!sym(paste0(prefix, vn)) == 1) %>%
+                    filter(!!sym(paste0(prefix, "sso_", druh)) == 1) %>%
+                    dplyr::select(geometry)
+            }
+
+            if (vn == "TS.AO" | vn == "TO.AO") {
+                p.temp <- tgobV$p %>%
+                    # filter(DRUH != druh) %>%
+                    filter(!!sym(paste0(prefix, vn, "_", druh)) == 1) %>%
+                    filter(!!sym(paste0(prefix, "sso_", druh)) == 1) %>%
+                    dplyr::select(geometry)
+            }
+
+            if (nrow(p.temp) < 1) {
+                print("neexistují presence základní verze!!!")
+                next
+            }
+
+            collector[[paste0(vns, ".sso")]] <- tgbg::bg(p.temp, predictors[[1]], sigma = ndop.fs$adjusts, output = ndop.fs$outputBgBr, anisotropic = TRUE)
+        }
+
+
 
         # if (!str_detect(vn, "sso\\.w")) {
         # # ssos podverze ze základních, nedělám ale z už vážených sso, tam je ten výběr proveden už při vzniku
@@ -686,13 +803,43 @@ repeat {
             }
         }
 
-        collector.rs <- stack(collector.rl)
+
+        collector.rs <- stack(unlist(collector.rl[1:(length(collector.rl) - 1)]))
         names(collector.rs) <- cn.names
 
-        vs.vc <- usdmPB::vifcor(collector.rs, th = 0.7)
-
         # předběžně uložit
-        saveRDS(vs.vc, paste0(path.tgob, "v_vs.vc_", druh, "_", rep, ".rds"))
+        fnv <- paste0(path.tgob, "v_vs.vc_", druh, ".rds")
+        if (file.exists(fnv)) {
+            vs.vc <- readRDS(fnv)
+        } else {
+            if (rep > 1) {
+                print("čekám 1 ------------------------------------------------")
+                # 1
+                Sys.sleep(10)
+
+                # počkat na vytvoření souboru s vifcor, ať mám jeden jednotný
+                if (file.exists(fnv)) {
+                    vs.vc <- readRDS(fnv)
+                } else {
+                    # 2
+                    print("čekám 2 ------------------------------------------------")
+                    Sys.sleep(60)
+                    if (file.exists(fnv)) {
+                        vs.vc <- readRDS(fnv)
+                    } else {
+                        # 3
+                        print("čekám 3 ------------------------------------------------")
+                        Sys.sleep(60 * 5)
+                        vs.vc <- readRDS(fnv)
+                    }
+                }
+            } else {
+                vs.vc <- usdmPB::vifcor(collector.rs, th = 0.99)
+                saveRDS(vs.vc, fnv)
+            }
+        }
+
+
 
         select.bg <- vs.vc@results$Variables
         pairs <- vs.vc@excludedPairs
@@ -719,7 +866,7 @@ repeat {
         pairs.prep.names <- sort(pairs.prep.names)
 
         cntr <- 1
-        for (ss in select.bg) {
+        for (ss in names(pairs.prep)) {
             str.ss <- strsplit(ss, split = "_")[[1]]
 
             collector.subset[[str.ss[1]]][["bg"]][[str.ss[2]]] <- collector[[str.ss[1]]][["bg"]][[str.ss[2]]]
@@ -736,6 +883,10 @@ repeat {
     for (id in names(collector)) {
         # id.names <- unlist(strsplit(id, "_"))
 
+        if (id %notin% c("TGOB", "TGOB.sso", "TGOB.sso.w", "TGOB.bss", "un")) {
+            # dočasný podvýběr !!!
+            next
+        }
         print(id)
         for (adjust in names(collector[[id]][["bg"]])) {
             print(adjust)
@@ -864,8 +1015,8 @@ repeat {
         }
     }
 
-    saveRDS(e.mx.all, paste0(path.tgob, "10ssos_", druh, "_", rep, ".rds"))
-    saveRDS(out.t, paste0(path.tgob, "t_10ssos_", druh, "_", rep, ".rds"))
+    saveRDS(e.mx.all, paste0(path.tgob, "14ssos_", druh, "_", rep, ".rds"))
+    saveRDS(out.t, paste0(path.tgob, "t_14ssos_", druh, "_", rep, ".rds"))
     gc()
     # } # for DRUH
 }

@@ -61,7 +61,6 @@ ndop.fs <- list("aucTresholds" = c(0.00, 0.70), "version" = "v1")
 withNull <- FALSE
 # remove thin to get only TGOB derived versions
 withThin <- FALSE
-
 minReps <- 5
 
 # generování ověření rozdílnosti verzí t.test-em (trvá extrémně dlouho, kešuju)
@@ -97,7 +96,7 @@ if (file.exists(modelsResults)) {
   # pro znovu vygenerování
   rds_list <-
     list.files(
-      path.eval,
+      path.tgob,
       pattern = paste0("^t_"),
       ignore.case = TRUE,
       full.names = TRUE
@@ -113,6 +112,11 @@ if (file.exists(modelsResults)) {
 
     rds <- readRDS(rdsPath)
     rds$rep <- r
+
+    # # dočasné: vzniká mi tu v kombinaci un/0 ve version2 NA které pak níže neprojdou přes na.omit(), přepsat
+    rds %<>% mutate(version2 = ifelse(is.na(version2) & version == "un" & adjust == 0, "un", version2))
+    #  rds %<>% dplyr::select(-version2)
+
     if (first) {
       first <- FALSE
       out <- rds
@@ -126,6 +130,9 @@ if (file.exists(modelsResults)) {
 }
 
 
+#
+# asi už nemůžu párovat (groupovat) podle adjustu a version - sjednocením vifcor to není možné? jen podle tune.args+species a nějak detekcí všech verzí z version2 ???!!!
+#
 
 modelsResults.avg <- paste0(path.eval, "tbl.rds")
 if (file.exists(modelsResults.avg)) {
@@ -160,6 +167,36 @@ if (file.exists(modelsResults.avg)) {
   tbl %<>% ungroup() %>% mutate(id = row_number())
   saveRDS(tbl, paste0(path.eval, "tbl.rds"))
 }
+
+#
+### version2 - rozdělení zgroupovaného sloupce vifcor-em na samostatné řádky
+#
+
+tbl.old <- tbl # záloha
+tbl.longer <- tbl %>%
+  ungroup() %>%
+  mutate(id.old = id) %>%
+  separate_longer_delim(version2, delim = "|") %>%
+  separate_wider_delim(version2, delim = "_", names = c("versionD", "adjustD"), too_few = "align_start", cols_remove = FALSE) %>%
+  rename(version.old = version) %>%
+  rename(version = versionD) %>%
+  mutate(id = row_number()) # raději přeindexuju
+
+tbl <- tbl.longer
+
+
+tbl.rep.old <- tbl.rep # záloha
+tbl.rep.longer <- tbl.rep %>%
+  ungroup() %>%
+  separate_longer_delim(version2, delim = "|") %>%
+  separate_wider_delim(version2, delim = "_", names = c("versionD", "adjustD"), too_few = "align_start", cols_remove = FALSE) %>%
+  rename(version.old = version) %>%
+  rename(version = versionD)
+
+tbl.rep <- tbl.rep.longer
+
+###
+
 # vu <- unique(tbl$version)
 
 # tbl %<>% add_row(tbl_5)
@@ -172,21 +209,53 @@ if (file.exists(modelsResults.avg)) {
 # selection.f2 <- c("ssosTSAO", "ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "TSAO", "un")
 # selection.rename <- c("ssosTSAO", "ssosTGOB", "ssosTO", "ssosTS", "TGOB", "TO", "TS", "TSAO", "thin")
 
+
+# selection <- c(
+#   "TGOB",
+#   "TS.w",
+#   "TO.w",
+#   "TGOB.sso.w",
+#   "un"
+# )
+# selection <- c(
+#   "TGOB",
+#   "TGOB.bss",
+#   "TO.w",
+#   "TS.w",
+#   "TGOB.sso.w",
+#   "TGOB.sso.w.3",
+#   "TGOB.sso.w.dnorm1.median",
+#   "TGOB.sso.w.3.dnorm1.median",
+#   "TGOB.sso.w.dnorm1.mean",
+#   "TGOB.sso.w.3.dnorm1.mean"  ,
+#   "TGOB.sso.w.dnorm2.median",
+#   "TGOB.sso.w.3.dnorm2.median",
+#   "TGOB.sso.w.dnorm2.mean",
+#   "TGOB.sso.w.3.dnorm2.mean",
+#   "un"
+# )
+
 selection <- c(
-  "TGOB", "ssosTGOB",
-  "TSAO", "ssosTSAO",
-  "TO", "ssosTO",
-  "TS", "ssosTS",
+  "TGOB",
+  "TGOB.sso",
+  "TGOB.sso.w",
+  # "TGOB.sso.w.3p",
+  "TS.w",
+  "TS.w.sso",
+
+  "TO.w",
+  "TO.w.sso",
+
+  "TGOB.bss",
+
   "un"
 )
+
+
+
+
 # selection.f <- c("ssos.topA100", "ssos.topS10", "tgob", "topA100", "topS10", "un", "ssos") # soos záměrně na konci
-selection.f2 <- c(
-  "TGOB", "ssosTGOB",
-  "TSAO", "ssosTSAO",
-  "TO", "ssosTO",
-  "TS", "ssosTS",
-  "un"
-)
+selection.f2 <- selection
 # selection.rename <- c(
 #   "TGOB", "ssoTGOB",
 #   "TSAO", "ssoTSAO",
@@ -194,43 +263,67 @@ selection.f2 <- c(
 #   "TS", "ssoTS",
 #   "thin"
 # )
-selection.rename <- c(
-  "TGOB", "TGOBsso",
-  "TSAO", "TSAOsso",
-  "TO", "TOsso",
-  "TS", "TS.sso", # tečka dočasně kvůli řazení v legendě
-  ".thin" # tečka dočasně kvůli řazení v legendě
-)
+
+# selection.rename <- c(
+#   "TGOB",
+#   "TGOB.sso",
+#     "TGOB.sso.w2",
+#   #"TGOB.sso.w.3p",
+#   #"TGOB.bss",
+
+#   ".thin" # tečka dočasně kvůli řazení v legendě
+# )
+
+selection.rename <- str_replace(selection, "un", ".thin")
+
+
+
 selection.f2 <- paste0("^", selection.f2, "$")
 
 
 names(selection.rename) <- selection.f2
 
 pairs.compare <- list()
-pairs.compare[[selection.rename[1]]] <- selection.rename[1:2]
-pairs.compare[[selection.rename[3]]] <- selection.rename[3:4]
-pairs.compare[[selection.rename[5]]] <- selection.rename[5:6]
-pairs.compare[[selection.rename[7]]] <- selection.rename[7:8]
+pairs.compare[[selection.rename[1]]] <- selection.rename[c(1, 2)]
+
+# pairs.compare[[selection.rename[2]]] <- selection.rename[c(1, 3)]
+# pairs.compare[[selection.rename[3]]] <- selection.rename[c(2, 3)]
 
 
-# # friendly
-# # black + green / orange + yellow /  blue + skyblue / red + pink
-# selection.colors <- c(
-#   "#000000", "#009e73",
-#   "#e69f00", "#f0e442",
-#   "#0072b2", "#56b4e9",
-#   "#d55e00", "#cc79a7",
-#   "#e0e0e0"
-# )
-
-# black + green / orange + yellow /  blue + skyblue / red + pink
 selection.colors <- c(
-  "#1f2124", "#6a6e73",
-  "#006414", "#5ccb5f",
-  "#1465bb", "#81c9fa",
-  "#bd0003", "#ff6c3e",
-  "#e0e0e0"
+  "#87CEFA",
+  "#1E90FF",
+  "#0066cc",
+
+  "#7CFC00",
+  "#008000",
+
+  "#FA8072",
+  "#FF0000",
+
+  "#000000",
+
+  "#C0C0C0"
 )
+
+# #
+# # barvy generuju... - pokud si nedám vlastní výše
+# #
+# vu <- sort(unique(tbl$version))
+# vu.colors <- palette(rainbow(length(vu)))
+# selection.colors <- vu.colors
+# selection <- selection.f2 <- selection.rename <- vu
+
+# # znovu z dřívějška
+# selection.f2 <- paste0("^", selection.f2, "$")
+# names(selection.rename) <- selection.f2
+# pairs.compare <- list()
+# pairs.compare[[selection.rename[1]]] <- selection.rename[c(1, 2)]
+# #
+# # barvy generuju... (konec)
+# #
+
+
 # selection.colors <- paste0("#", selection.colors)
 names(selection.colors) <- paste0("^", selection.rename, "$")
 
@@ -356,7 +449,7 @@ tbl.f <- tbl %>%
   group_by(species, version) # final versions selection
 
 selection.f2 <- selection.rename
-k6 <- comb_all(selection.f2, length(selection.f2))
+k6 <- comb_all(selection.f2, 3) # length(selection.f2)
 
 tbl.nn <- tbl.f %>% filter(id %notin% tbl.null.ids.unique) # not null
 tbl.null <- tbl %>% filter(id %in% tbl.null.ids.unique) # null - musím brát z původní tabulky vždy - ikdyž počítám s !withThin
@@ -429,52 +522,76 @@ for (at in ndop.fs$aucTresholds) {
   # korelovanost výsledků auc AUC v rámci metod
   # níže zatím řeším jen korelovanost jak nejlepší val model odpovídá témuž test - neřeším ale nakolik nejlepší val trefuje nejlepší test - to ale dělám ve "val.test", které jsem zatím stopnul uprostřed změn... - dodělat!!!???
 
-  zasobnik <- list()
-  for (ver in unique(tbl.nn$version)) {
-    tmp <- tbl.nn %>%
-      ungroup() %>%
-      filter(auc.val.avg >= at) %>%
-      filter(version == ver)
-    ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
-    zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
-    zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
-    zasobnik[[ver]][["ci.min"]] <- ct[["conf.int"]][1]
-    zasobnik[[ver]][["ci.max"]] <- ct[["conf.int"]][2]
-  }
-  zasobnik.t <- t(as_tibble(zasobnik))
-  rn <- row.names(zasobnik.t)
-  cn <- names(zasobnik[[1]])
-  zasobnik.t <- as.data.frame(zasobnik.t)
-  zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
-  names(zasobnik.t) <- cn
-  zasobnik.t$version <- rn
-  zasobnik0[[as.character(at)]][["all"]] <- zasobnik.t %<>% arrange(desc(cor))
-  write.csv(zasobnik.t, paste0(path.PP, "korelace-", as.character(at), ".csv"), row.names = FALSE)
 
-  # max verze
-  zasobnik <- list()
-  for (ver in unique(tbl.nn$version)) {
-    tmp <- tbl.nn %>%
-      ungroup() %>%
-      group_by(species, version) %>%
-      slice_max(auc.val.avg, with_ties = FALSE) %>%
-      filter(auc.val.avg >= at) %>%
-      filter(version == ver)
-    ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
-    zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
-    zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
-    zasobnik[[ver]][["ci.min"]] <- ct[["conf.int"]][1]
-    zasobnik[[ver]][["ci.max"]] <- ct[["conf.int"]][2]
-  }
-  zasobnik.t <- t(as_tibble(zasobnik))
-  rn <- row.names(zasobnik.t)
-  cn <- names(zasobnik[[1]])
-  zasobnik.t <- as.data.frame(zasobnik.t)
-  zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
-  names(zasobnik.t) <- cn
-  zasobnik.t$version <- rn
-  zasobnik0[[as.character(at)]][["max"]] <- zasobnik.t %<>% arrange(desc(cor))
-  write.csv(zasobnik.t, paste0(path.PP, "korelace-max-", as.character(at), ".csv"), row.names = FALSE)
+
+
+
+
+
+
+
+
+  #
+  # @@@ nelze použít v současném systému verzí, nevím která je první vybraná ve version, musel bych nějak parsovat version2
+  #
+
+
+  # zasobnik <- list()
+  # for (ver in unique(tbl.nn$version)) {
+  #   tmp <- tbl.nn %>%
+  #     ungroup() %>%
+  #     filter(auc.val.avg >= at) %>%
+  #     filter(version == ver)
+  #   ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
+  #   zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
+  #   zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
+  #   zasobnik[[ver]][["ci.min"]] <- ct[["conf.int"]][1]
+  #   zasobnik[[ver]][["ci.max"]] <- ct[["conf.int"]][2]
+  # }
+  # zasobnik.t <- t(as_tibble(zasobnik))
+  # rn <- row.names(zasobnik.t)
+  # cn <- names(zasobnik[[1]])
+  # zasobnik.t <- as.data.frame(zasobnik.t)
+  # zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
+  # names(zasobnik.t) <- cn
+  # zasobnik.t$version <- rn
+  # zasobnik0[[as.character(at)]][["all"]] <- zasobnik.t %<>% arrange(desc(cor))
+  # write.csv(zasobnik.t, paste0(path.PP, "korelace-", as.character(at), ".csv"), row.names = FALSE)
+  #
+  # # max verze
+  # zasobnik <- list()
+  # for (ver in unique(tbl.nn$version)) {
+  #   tmp <- tbl.nn %>%
+  #     ungroup() %>%
+  #     group_by(species, version) %>%
+  #     slice_max(auc.val.avg, with_ties = FALSE) %>%
+  #     filter(auc.val.avg >= at) %>%
+  #     filter(version == ver)
+  #   ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
+  #   zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
+  #   zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
+  #   zasobnik[[ver]][["ci.min"]] <- ct[["conf.int"]][1]
+  #   zasobnik[[ver]][["ci.max"]] <- ct[["conf.int"]][2]
+  # }
+  # zasobnik.t <- t(as_tibble(zasobnik))
+  # rn <- row.names(zasobnik.t)
+  # cn <- names(zasobnik[[1]])
+  # zasobnik.t <- as.data.frame(zasobnik.t)
+  # zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
+  # names(zasobnik.t) <- cn
+  # zasobnik.t$version <- rn
+  # zasobnik0[[as.character(at)]][["max"]] <- zasobnik.t %<>% arrange(desc(cor))
+  # write.csv(zasobnik.t, paste0(path.PP, "korelace-max-", as.character(at), ".csv"), row.names = FALSE)
+
+  #
+  # @@@ nelze použít v současném systému verzí, nevím která je první vybraná ve version, musel bych nějak parsovat version2
+  #
+
+
+
+
+
+
 
 
 
@@ -546,23 +663,24 @@ for (at in ndop.fs$aucTresholds) {
       print("top2:")
       top2 <- tmptbl %>% filter(species == sp)
 
-      top2v <- lapply(1:2, function(x) {
-        tmp <- list()
-        tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
-        tmp[["top"]] <- top2[x, ]$version
+      # 111
+      # top2v <- lapply(1:2, function(x) {
+      #   tmp <- list()
+      #   tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
+      #   tmp[["top"]] <- top2[x, ]$version
+      #
+      #   # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
+      #   # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      #   if (nrow(tmp[["t"]]) >= 333) {
+      #     tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$auc.val.avg)$p.value
+      #   } else {
+      #     print(" < 3 replikací !!!")
+      #     tmp[["shapiro.p"]] <- 0
+      #   }
+      #   return(tmp)
+      # })
 
-        # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
-        # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if (nrow(tmp[["t"]]) >= 3) {
-          tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$auc.val.avg)$p.value
-        } else {
-          print(" < 3 replikací !!!")
-          tmp[["shapiro.p"]] <- 0
-        }
-        return(tmp)
-      })
-
-      top2v.normality <- sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
+      top2v.normality <- FALSE # sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
 
       # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
       # vartest <- var.test(top2v[[1]][["t"]]$auc.val.avg, top2v[[2]][["t"]]$auc.val.avg)   # p < 0.05 (Variances are not equal)
@@ -591,14 +709,14 @@ for (at in ndop.fs$aucTresholds) {
 
       tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
 
-      if (nrow(tmp.null.t) >= 3) {
+      if (nrow(tmp.null.t) >= 333) {
         tmp.null <- shapiro.test(tmp.null.t$auc.val.avg)$p.value
       } else {
         print("null < 3 replikací !!!")
         tmp.null <- 0
       }
 
-      top1null.normality <- sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
+      top1null.normality <- FALSE # sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
 
       if (top1null.normality) {
         print("OK (normality)")
@@ -628,6 +746,7 @@ for (at in ndop.fs$aucTresholds) {
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
     theme_light() +
     theme(
+      legend.text = element_text(size = 4),
       text = element_text(size = 6),
       axis.text.y = element_markdown(),
       # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
@@ -663,7 +782,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
   tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP.val, "trend-overall-best-species.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best-species.val.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
 
   # occs.n
@@ -674,7 +793,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByOccs.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByOccs.val.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
   # auc.val.avgdiff
   no.temp <- no %>%
@@ -684,7 +803,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avgdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByDiff.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByDiff.val.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
   # auc.val.avg
   no.temp <- no %>%
@@ -694,7 +813,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAuc.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAuc.val.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
   # auc.val.avg_null
   no.temp <- no %>%
@@ -704,7 +823,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAucNull.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAucNull.val.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
   ### ### ### endB
 
@@ -744,23 +863,24 @@ for (at in ndop.fs$aucTresholds) {
         print("top2:")
         top2 <- tmptbl %>% filter(species == sp)
 
-        top2v <- lapply(1:2, function(x) {
-          tmp <- list()
-          tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
-          tmp[["top"]] <- top2[x, ]$version
+        # 111
+        #         top2v <- lapply(1:2, function(x) {
+        #           tmp <- list()
+        #           tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
+        #           tmp[["top"]] <- top2[x, ]$version
+        #
+        #           # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
+        #           # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        #           if (nrow(tmp[["t"]]) >= 333) {
+        #             tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$auc.val.avg)$p.value
+        #           } else {
+        #             print(" < 3 replikací !!!")
+        #             tmp[["shapiro.p"]] <- 0
+        #           }
+        #           return(tmp)
+        #         })
 
-          # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
-          # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          if (nrow(tmp[["t"]]) >= 3) {
-            tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$auc.val.avg)$p.value
-          } else {
-            print(" < 3 replikací !!!")
-            tmp[["shapiro.p"]] <- 0
-          }
-          return(tmp)
-        })
-
-        top2v.normality <- sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
+        top2v.normality <- FALSE # sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
 
         # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
         # vartest <- var.test(top2v[[1]][["t"]]$auc.val.avg, top2v[[2]][["t"]]$auc.val.avg)   # p < 0.05 (Variances are not equal)
@@ -789,14 +909,14 @@ for (at in ndop.fs$aucTresholds) {
 
         tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
 
-        if (nrow(tmp.null.t) >= 3) {
+        if (nrow(tmp.null.t) >= 333) {
           tmp.null <- shapiro.test(tmp.null.t$auc.val.avg)$p.value
         } else {
           print("null < 3 replikací !!!")
           tmp.null <- 0
         }
 
-        top1null.normality <- sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
+        top1null.normality <- FALSE # sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
 
         if (top1null.normality) {
           print("OK (normality)")
@@ -827,6 +947,7 @@ for (at in ndop.fs$aucTresholds) {
       scale_fill_manual(values = unique(unname(unlist(temp.g.c %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
       theme_light() +
       theme(
+        legend.text = element_text(size = 4),
         text = element_text(size = 6),
         axis.text.y = element_markdown(),
         # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
@@ -863,7 +984,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
     tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.val, "trend-overall-best-species.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.val, "trend-overall-best-species.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
 
 
     # occs.n
@@ -874,7 +995,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByOccs.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByOccs.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
 
     # auc.val.avgdiff
     no.temp <- no %>%
@@ -884,7 +1005,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avgdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByDiff.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByDiff.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
 
     # auc.val.avg
     no.temp <- no %>%
@@ -894,7 +1015,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAuc.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAuc.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
 
     # auc.val.avg_null
     no.temp <- no %>%
@@ -904,7 +1025,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best auc.val.avg_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAucNull.val.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.val, "trend-overall-best-species-orderByAucNull.val.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
 
     ### ### ### endB
   }
@@ -912,7 +1033,7 @@ for (at in ndop.fs$aucTresholds) {
 
   # a) vše
   ggplot(temp.g %>% ungroup(), aes(occs.n, auc.val.avgdiff)) +
-    geom_point(aes(colour = factor(version)), size = 0.5) +
+    geom_point(aes(colour = factor(version)), size = 0.1) +
     geom_smooth(method = loess, size = 0.2) +
     scale_color_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
     theme_light() +
@@ -984,14 +1105,14 @@ for (at in ndop.fs$aucTresholds) {
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
     theme_light() +
     theme(
-      legend.position = "none", text = element_text(size = 4),
+      legend.position = "none", text = element_text(size = 3),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1)),
       panel.margin = unit(0.2, "lines")
     ) +
     facet_wrap(~species, labeller = as_labeller(title))
-  ggsave(paste0(path.PP.val, "version-species.val.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val, "version-species.val.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
 
 
@@ -1015,7 +1136,7 @@ for (at in ndop.fs$aucTresholds) {
     theme_light() +
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
-      legend.position = "none", text = element_text(size = 5),
+      legend.position = "none", text = element_text(size = 3),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
@@ -1089,7 +1210,7 @@ for (at in ndop.fs$aucTresholds) {
     theme_light() +
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
-      legend.position = "none", text = element_text(size = 4),
+      legend.position = "none", text = element_text(size = 3),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
@@ -1098,11 +1219,11 @@ for (at in ndop.fs$aucTresholds) {
 
   # a) vše
   ggplot(temp.g %>% ungroup(), aes(occs.n, auc.val.avgdiff)) +
-    geom_point(aes(colour = factor(version)), size = 0.05) +
+    geom_point(aes(colour = factor(version)), size = 0.01) +
     geom_smooth(method = loess, size = 0.2) +
     theme_light() +
     theme(
-      legend.position = "none", text = element_text(size = 6),
+      legend.position = "none", text = element_text(size = 3),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
@@ -1117,14 +1238,14 @@ for (at in ndop.fs$aucTresholds) {
     geom_bar(stat = "identity", aes(fill = factor(version))) +
     theme_light() +
     theme(
-      legend.position = "none", text = element_text(size = 4),
+      legend.position = "none", text = element_text(size = 3),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1)),
       panel.margin = unit(0.2, "lines")
     ) +
     facet_wrap(~species, labeller = as_labeller(title))
-  ggsave(paste0(path.PP.val.test, "version-species.val.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.val.test, "version-species.val.test.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
   # přispění kombinací
   temp.g %<>% ungroup()
@@ -1202,23 +1323,24 @@ for (at in ndop.fs$aucTresholds) {
       print("top2:")
       top2 <- tmptbl %>% filter(species == sp)
 
-      top2v <- lapply(1:2, function(x) {
-        tmp <- list()
-        tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
-        tmp[["top"]] <- top2[x, ]$version
+      # 111
+      # top2v <- lapply(1:2, function(x) {
+      #   tmp <- list()
+      #   tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
+      #   tmp[["top"]] <- top2[x, ]$version
+      #
+      #   # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
+      #   # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      #   if (nrow(tmp[["t"]]) >= 333) {
+      #     tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$AUC)$p.value
+      #   } else {
+      #     print(" < 3 replikací !!!")
+      #     tmp[["shapiro.p"]] <- 0
+      #   }
+      #   return(tmp)
+      # })
 
-        # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
-        # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if (nrow(tmp[["t"]]) >= 3) {
-          tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$AUC)$p.value
-        } else {
-          print(" < 3 replikací !!!")
-          tmp[["shapiro.p"]] <- 0
-        }
-        return(tmp)
-      })
-
-      top2v.normality <- sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
+      top2v.normality <- FALSE # sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
 
       # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
       # vartest <- var.test(top2v[[1]][["t"]]$AUC, top2v[[2]][["t"]]$AUC)   # p < 0.05 (Variances are not equal)
@@ -1247,14 +1369,14 @@ for (at in ndop.fs$aucTresholds) {
 
       tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
 
-      if (nrow(tmp.null.t) >= 3) {
+      if (nrow(tmp.null.t) >= 333) {
         tmp.null <- shapiro.test(tmp.null.t$AUC)$p.value
       } else {
         print("null < 3 replikací !!!")
         tmp.null <- 0
       }
 
-      top1null.normality <- sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
+      top1null.normality <- FALSE # sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
 
       if (top1null.normality) {
         print("OK (normality)")
@@ -1285,6 +1407,7 @@ for (at in ndop.fs$aucTresholds) {
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
     theme_light() +
     theme(
+      legend.text = element_text(size = 4),
       text = element_text(size = 6),
       axis.text.y = element_markdown(),
       # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
@@ -1323,7 +1446,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
   tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP.test, "trend-overall-best-species.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best-species.test.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
   # occs.n
   no.temp <- no %>%
@@ -1333,7 +1456,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByOccs.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByOccs.test.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
   # AUCdiff
   no.temp <- no %>%
@@ -1343,7 +1466,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUCdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
   # AUC
   no.temp <- no %>%
@@ -1353,7 +1476,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAuc.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAuc.test.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
   # AUC_null
   no.temp <- no %>%
@@ -1363,7 +1486,7 @@ for (at in ndop.fs$aucTresholds) {
   title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
   tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAucNull.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAucNull.test.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
   ### ### ### endB
 
@@ -1403,23 +1526,24 @@ for (at in ndop.fs$aucTresholds) {
         print("top2:")
         top2 <- tmptbl %>% filter(species == sp)
 
-        top2v <- lapply(1:2, function(x) {
-          tmp <- list()
-          tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
-          tmp[["top"]] <- top2[x, ]$version
+        # 111
+        # top2v <- lapply(1:2, function(x) {
+        #   tmp <- list()
+        #   tmp[["t"]] <- tbl.rep.nn %>% filter(species == sp & version == top2[x, ]$version & adjust == top2[x, ]$adjust & tune.args == top2[x, ]$tune.args)
+        #   tmp[["top"]] <- top2[x, ]$version
+        #
+        #   # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
+        #   # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        #   if (nrow(tmp[["t"]]) >= 333) {
+        #     tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$AUC)$p.value
+        #   } else {
+        #     print(" < 3 replikací !!!")
+        #     tmp[["shapiro.p"]] <- 0
+        #   }
+        #   return(tmp)
+        # })
 
-          # p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution, we can assume the normality.
-          # kontrolu na alespoň 3 replikace musím udělat úplně na začátku!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          if (nrow(tmp[["t"]]) >= 3) {
-            tmp[["shapiro.p"]] <- shapiro.test(tmp[["t"]]$AUC)$p.value
-          } else {
-            print(" < 3 replikací !!!")
-            tmp[["shapiro.p"]] <- 0
-          }
-          return(tmp)
-        })
-
-        top2v.normality <- sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
+        top2v.normality <- FALSE # sum(sapply(top2v, function(x) x$shapiro.p > 0.05)) == 2
 
         # # F test: variances of the two groups are equal? netřeba, pokud nejsou stejné v t.test-u se provede Welch místo klasického
         # vartest <- var.test(top2v[[1]][["t"]]$AUC, top2v[[2]][["t"]]$AUC)   # p < 0.05 (Variances are not equal)
@@ -1448,14 +1572,14 @@ for (at in ndop.fs$aucTresholds) {
 
         tmp.null.t <- tbl.rep.null %>% filter(species == sp & version == top1null[1, ]$version & adjust == top1null[1, ]$adjust & tune.args == top1null[1, ]$tune.args)
 
-        if (nrow(tmp.null.t) >= 3) {
+        if (nrow(tmp.null.t) >= 333) {
           tmp.null <- shapiro.test(tmp.null.t$AUC)$p.value
         } else {
           print("null < 3 replikací !!!")
           tmp.null <- 0
         }
 
-        top1null.normality <- sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
+        top1null.normality <- FALSE # sum(c(tmp.null > 0.05, top2v[[1]]$shapiro.p > 0.05)) == 2
 
         if (top1null.normality) {
           print("OK (normality)")
@@ -1486,6 +1610,7 @@ for (at in ndop.fs$aucTresholds) {
       scale_fill_manual(values = unique(unname(unlist(temp.g.c %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
       theme_light() +
       theme(
+        legend.text = element_text(size = 4),
         text = element_text(size = 6),
         axis.text.y = element_markdown(),
         # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 3),
@@ -1521,7 +1646,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no$occs.n))))
 
     tobs + scale_x_discrete(labels = rev(title.occs.n), limits = rev) + xlab("species (ordered by: alphabet); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.test, "trend-overall-best-species.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.test, "trend-overall-best-species.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
 
     # occs.n
     no.temp <- no %>%
@@ -1531,7 +1656,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: sum of occupied squares); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByOccs.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByOccs.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
 
     # AUCdiff
     no.temp <- no %>%
@@ -1541,7 +1666,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUCdiff); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByDiff.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
 
     # AUC
     no.temp <- no %>%
@@ -1551,7 +1676,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAuc.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAuc.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
 
     # AUC_null
     no.temp <- no %>%
@@ -1561,7 +1686,7 @@ for (at in ndop.fs$aucTresholds) {
     title.occs.n <- paste0(title, " | ", sprintf("%04d", unname(unlist(no.temp$occs.n))))
 
     tobs + scale_x_discrete(labels = title.occs.n, limits = order.new) + xlab("species (ordered by: best AUC_null); AUCnull->AUCbest | sum of occupied squares") + coord_flip()
-    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAucNull.test.", as.character(at), "---", cmp[1], ".png"), width = 1500, height = 2000, units = "px")
+    ggsave(paste0(path.PP.test, "trend-overall-best-species-orderByAucNull.test.", as.character(at), "---", cmp[1], ".png"), width = 2000, height = 2000, units = "px")
 
     ### ### ### endB
   }
@@ -1569,7 +1694,7 @@ for (at in ndop.fs$aucTresholds) {
 
   # a) vše
   ggplot(temp.g %>% ungroup(), aes(occs.n, AUCdiff)) +
-    geom_point(aes(colour = factor(version)), size = 0.5) +
+    geom_point(aes(colour = factor(version)), size = 0.1) +
     geom_smooth(method = loess, size = 0.2) +
     scale_color_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
     theme_light() +
@@ -1637,14 +1762,14 @@ for (at in ndop.fs$aucTresholds) {
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
     theme_light() +
     theme(
-      legend.position = "none", text = element_text(size = 4),
+      legend.position = "none", text = element_text(size = 3),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1)),
       panel.margin = unit(0.2, "lines")
     ) +
     facet_wrap(~species, labeller = as_labeller(title))
-  ggsave(paste0(path.PP.test, "version-species.test.", as.character(at), ".png"), width = 1500, height = 2000, units = "px")
+  ggsave(paste0(path.PP.test, "version-species.test.", as.character(at), ".png"), width = 2000, height = 2000, units = "px")
 
 
 
@@ -1668,7 +1793,7 @@ for (at in ndop.fs$aucTresholds) {
     theme_light() +
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
-      legend.position = "none", text = element_text(size = 5),
+      legend.position = "none", text = element_text(size = 3),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
