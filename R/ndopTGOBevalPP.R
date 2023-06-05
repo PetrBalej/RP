@@ -1158,7 +1158,7 @@ for (at in ndop.fs$aucTresholds) {
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
     theme_light() +
     theme(
-      legend.position = "none", text = element_text(size = 3),
+      legend.position = "none", text = element_text(size = 4),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1)),
@@ -1189,7 +1189,7 @@ for (at in ndop.fs$aucTresholds) {
     theme_light() +
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
-      legend.position = "none", text = element_text(size = 3),
+      legend.position = "none", text = element_text(size = 4),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
@@ -1263,7 +1263,7 @@ for (at in ndop.fs$aucTresholds) {
     theme_light() +
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
-      legend.position = "none", text = element_text(size = 3),
+      legend.position = "none", text = element_text(size = 4),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
@@ -1276,7 +1276,7 @@ for (at in ndop.fs$aucTresholds) {
     geom_smooth(method = loess, size = 0.2) +
     theme_light() +
     theme(
-      legend.position = "none", text = element_text(size = 3),
+      legend.position = "none", text = element_text(size = 4),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1))
     ) +
@@ -1291,7 +1291,7 @@ for (at in ndop.fs$aucTresholds) {
     geom_bar(stat = "identity", aes(fill = factor(version))) +
     theme_light() +
     theme(
-      legend.position = "none", text = element_text(size = 3),
+      legend.position = "none", text = element_text(size = 4),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1)),
@@ -1381,7 +1381,7 @@ for (at in ndop.fs$aucTresholds) {
     width = 0.0, size = 0.2, alpha = 0.90
     ) +
     theme(
-      legend.text = element_text(size = 3),
+      legend.text = element_text(size = 4),
       text = element_text(size = 4)
     )
 
@@ -1889,7 +1889,7 @@ for (at in ndop.fs$aucTresholds) {
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(version)) %>% dplyr::select(clr))))) +
     theme_light() +
     theme(
-      legend.position = "none", text = element_text(size = 3),
+      legend.position = "none", text = element_text(size = 4),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       strip.text = element_text(margin = margin(t = 1, r = 1, b = 1, l = 1)),
@@ -1920,7 +1920,7 @@ for (at in ndop.fs$aucTresholds) {
     theme_light() +
     scale_fill_manual(values = unique(unname(unlist(temp.g %>% group_by(version) %>% slice_head(n = 1) %>% ungroup() %>% arrange(tolower(clr)) %>% dplyr::select(clr))))) +
     theme(
-      legend.position = "none", text = element_text(size = 3),
+      legend.position = "none", text = element_text(size = 4),
       panel.grid.minor = element_line(size = 0.01), panel.grid.major = element_line(size = 0.1),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
     )
