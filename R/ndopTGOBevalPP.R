@@ -1,7 +1,7 @@
 start_time <- Sys.time()
 
 # kontrola (do)instalace všech dodatečně potřebných balíčků
-required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "sdmATM", "ggplot2", "grid", "gridExtra", "ggtext", "rmarkdown") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
+required_packages <- c("tidyverse", "sf", "magrittr", "stringi", "raster", "spatstat", "ENMeval", "sdmATM", "ggplot2", "grid", "gridExtra", "ggtext", "rmarkdown", "grDevices") # c("sp", "rgdal", "mapview", "raster", "geojsonio", "stars", "httpuv", "tidyverse", "sf", "lubridate", "magrittr", "dplyr", "readxl", "abind", "stringr")
 
 install.packages(setdiff(required_packages, rownames(installed.packages())))
 
@@ -58,6 +58,8 @@ ndop.fs <- list("aucTresholds" = c(0.00, 0.70), "version" = "v1")
 ############
 
 se <- function(x) sqrt(var(x) / length(x))
+
+# tofo: doplnit možnost "un" jako zobrazované samostatné varianty!!!. jen nebude figurovat v diff grafech, tam je to nesmysl
 
 # select null if performs better
 withNull <- FALSE

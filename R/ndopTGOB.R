@@ -197,7 +197,7 @@ scenarios.selected <- list(
 
 ndop.fs <- list(
     "adjusts" = c(0.1, 1, 2, 3),
-    "tuneArgs" = list(fc = c("L", "LQ", "LQP", "LQH", "LQHP"), rm = c(0.5, 1, 2, 3, 4)), # , "H", "LQH", "LQHP"
+    "tuneArgs" = list(fc = c("L", "LQ", "LQP"), rm = c(0.5, 1, 2, 3)), # light, full: "L", "LQ", "LQP", "LQH", "LQHP" c(0.5, 1, 2, 3, 4)
     "bgRatio" = 1 / 10,
     "bg" = 1000,
     "speciesPerGroup" = 2, "speciesOccMin" = 30,
@@ -208,7 +208,7 @@ ndop.fs <- list(
     "bgRaster" = FALSE,
     "versionNames" = vn, "versionSmooting" = vf,
     "outputBgBr" = c("bg", "br"), # c("bg", "br")
-    "scenario" = "bg", # "bg", "br", "brAll", "bgAll"
+    "scenario" = "bgAll", # "bg", "br", "brAll", "bgAll"
     "scenarios" = scenarios.selected
 )
 
@@ -281,7 +281,7 @@ fn <- paste0(path.tgob, "tgobV.rds")
 
 #  # rozdělím per species tgobV - optimalizace
 # cnames <- names(tgobV$p)
-# for(sp in unique(tgobV$p$DRUH)){ # unique(lsd.pa.min$TaxonNameLAT)
+# for(sp in unique(lsd.pa.min$TaxonNameLAT)){ # unique(lsd.pa.min$TaxonNameLAT) unique(tgobV$p$DRUH)
 #
 #        cnames.c <- c(cnames[str_detect(cnames, paste0(sp, "$"))], "DRUH", "geometry", "nc_TO.w", "nc_TS.w", "nc_TO", "nc_TS") # paste0("nc_sso_", sp)
 #
@@ -497,7 +497,7 @@ repeat {
     #
     # versions.base.puv <- c("TGOB", "TO", "TS", "TO.w", "TS.w")
     # versions.base <- c("TGOB", "TO.w", "TS.w")
-    versions.base <- c("TGOB")
+    versions.base <- c("TGOB", "TO", "TS")
     # ao.sp <- ssos.sp[!str_detect(ssos.sp, "sso_")]
     # ao.sp.puv <- gsub(prefix, "", ao.sp)
     # ao.sp <- c()
@@ -883,10 +883,6 @@ repeat {
     for (id in names(collector)) {
         # id.names <- unlist(strsplit(id, "_"))
 
-        if (id %notin% c("TGOB", "TGOB.sso", "TGOB.sso.w", "TGOB.bss", "un")) {
-            # dočasný podvýběr !!!
-            next
-        }
         print(id)
         for (adjust in names(collector[[id]][["bg"]])) {
             print(adjust)
@@ -1015,8 +1011,8 @@ repeat {
         }
     }
 
-    saveRDS(e.mx.all, paste0(path.tgob, "14ssos_", druh, "_", rep, ".rds"))
-    saveRDS(out.t, paste0(path.tgob, "t_14ssos_", druh, "_", rep, ".rds"))
+    saveRDS(e.mx.all, paste0(path.tgob, "19ssos_", druh, "_", rep, ".rds"))
+    saveRDS(out.t, paste0(path.tgob, "t_19ssos_", druh, "_", rep, ".rds"))
     gc()
     # } # for DRUH
 }
