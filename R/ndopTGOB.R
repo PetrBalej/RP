@@ -1011,8 +1011,8 @@ repeat {
         }
     }
 
-    saveRDS(e.mx.all, paste0(path.tgob, "19ssos_", druh, "_", rep, ".rds"))
-    saveRDS(out.t, paste0(path.tgob, "t_19ssos_", druh, "_", rep, ".rds"))
+    saveRDS(e.mx.all, paste0(path.tgob, "20ssos_", druh, "_", rep, ".rds"))
+    saveRDS(out.t, paste0(path.tgob, "t_20ssos_", druh, "_", rep, ".rds"))
     gc()
     # } # for DRUH
 }

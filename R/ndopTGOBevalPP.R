@@ -247,7 +247,12 @@ selection <- c(
   "TGOB",
   "TGOB.sso",
   "TGOB.sso.w",
-  # "TGOB.sso.w.3p",
+
+  "TGOB.sso.w3",
+  "TGOB.sso.w4",
+  "TGOB.sso.w6",
+  "TGOB.sso.w7",
+
   "TS.w",
   "TS.w.sso",
 
@@ -302,6 +307,11 @@ selection.colors <- c(
   "#87CEFA",
   "#1E90FF",
   "#0066cc",
+
+  "#EE82EE",
+  "#FF00FF",
+  "#9932CC",
+  "#8B008B",
 
   "#7CFC00",
   "#008000",
@@ -567,52 +577,72 @@ for (at in ndop.fs$aucTresholds) {
   #
 
 
-  # zasobnik <- list()
-  # for (ver in unique(tbl.nn$version)) {
-  #   tmp <- tbl.nn %>%
-  #     ungroup() %>%
-  #     filter(auc.val.avg >= at) %>%
-  #     filter(version == ver)
-  #   ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
-  #   zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
-  #   zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
-  #   zasobnik[[ver]][["ci.min"]] <- ct[["conf.int"]][1]
-  #   zasobnik[[ver]][["ci.max"]] <- ct[["conf.int"]][2]
-  # }
-  # zasobnik.t <- t(as_tibble(zasobnik))
-  # rn <- row.names(zasobnik.t)
-  # cn <- names(zasobnik[[1]])
-  # zasobnik.t <- as.data.frame(zasobnik.t)
-  # zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
-  # names(zasobnik.t) <- cn
-  # zasobnik.t$version <- rn
-  # zasobnik0[[as.character(at)]][["all"]] <- zasobnik.t %<>% arrange(desc(cor))
-  # write.csv(zasobnik.t, paste0(path.PP, "korelace-", as.character(at), ".csv"), row.names = FALSE)
-  #
-  # # max verze
-  # zasobnik <- list()
-  # for (ver in unique(tbl.nn$version)) {
-  #   tmp <- tbl.nn %>%
-  #     ungroup() %>%
-  #     group_by(species, version) %>%
-  #     slice_max(auc.val.avg, with_ties = FALSE) %>%
-  #     filter(auc.val.avg >= at) %>%
-  #     filter(version == ver)
-  #   ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
-  #   zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
-  #   zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
-  #   zasobnik[[ver]][["ci.min"]] <- ct[["conf.int"]][1]
-  #   zasobnik[[ver]][["ci.max"]] <- ct[["conf.int"]][2]
-  # }
-  # zasobnik.t <- t(as_tibble(zasobnik))
-  # rn <- row.names(zasobnik.t)
-  # cn <- names(zasobnik[[1]])
-  # zasobnik.t <- as.data.frame(zasobnik.t)
-  # zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
-  # names(zasobnik.t) <- cn
-  # zasobnik.t$version <- rn
-  # zasobnik0[[as.character(at)]][["max"]] <- zasobnik.t %<>% arrange(desc(cor))
-  # write.csv(zasobnik.t, paste0(path.PP, "korelace-max-", as.character(at), ".csv"), row.names = FALSE)
+  zasobnik <- list()
+  for (ver in unique(tbl.nn$version)) {
+    tmp <- tbl.nn %>%
+      ungroup() %>%
+      filter(auc.val.avg >= at) %>%
+      filter(version == ver)
+
+    ct <- list()
+    if (inherits(try({
+      ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
+    }), "try-error")) {
+      ct[["estimate"]][["cor"]] <- 0
+      ct[["p.value"]] <- 0
+      ct[["conf.int"]][1] <- 0
+      ct[["conf.int"]][2] <- 0
+    }
+
+    zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
+    zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
+    zasobnik[[ver]][["ci.min"]] <- ct[["conf.int"]][1]
+    zasobnik[[ver]][["ci.max"]] <- ct[["conf.int"]][2]
+  }
+  zasobnik.t <- t(as_tibble(zasobnik))
+  rn <- row.names(zasobnik.t)
+  cn <- names(zasobnik[[1]])
+  zasobnik.t <- as.data.frame(zasobnik.t)
+  zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
+  names(zasobnik.t) <- cn
+  zasobnik.t$version <- rn
+  zasobnik0[[as.character(at)]][["all"]] <- zasobnik.t %<>% arrange(desc(cor))
+  write.csv(zasobnik.t, paste0(path.PP, "korelace-", as.character(at), ".csv"), row.names = FALSE)
+
+  # max verze
+  zasobnik <- list()
+  for (ver in unique(tbl.nn$version)) {
+    tmp <- tbl.nn %>%
+      ungroup() %>%
+      group_by(species, version) %>%
+      slice_max(auc.val.avg, with_ties = FALSE) %>%
+      filter(auc.val.avg >= at) %>%
+      filter(version == ver)
+
+    ct <- list()
+    if (inherits(try({
+      ct <- cor.test(tmp$auc.val.avg, tmp$AUC)
+    }), "try-error")) {
+      ct[["estimate"]][["cor"]] <- 0
+      ct[["p.value"]] <- 0
+      ct[["conf.int"]][1] <- 0
+      ct[["conf.int"]][2] <- 0
+    }
+
+    zasobnik[[ver]][["cor"]] <- ct[["estimate"]][["cor"]]
+    zasobnik[[ver]][["p.value"]] <- ct[["p.value"]]
+    zasobnik[[ver]][["ci.min"]] <- ct[["conf.int"]][1]
+    zasobnik[[ver]][["ci.max"]] <- ct[["conf.int"]][2]
+  }
+  zasobnik.t <- t(as_tibble(zasobnik))
+  rn <- row.names(zasobnik.t)
+  cn <- names(zasobnik[[1]])
+  zasobnik.t <- as.data.frame(zasobnik.t)
+  zasobnik.t <- as_tibble(sapply(zasobnik.t, as.numeric))
+  names(zasobnik.t) <- cn
+  zasobnik.t$version <- rn
+  zasobnik0[[as.character(at)]][["max"]] <- zasobnik.t %<>% arrange(desc(cor))
+  write.csv(zasobnik.t, paste0(path.PP, "korelace-max-", as.character(at), ".csv"), row.names = FALSE)
 
   #
   # @@@ nelze použít v současném systému verzí, nevím která je první vybraná ve version, musel bych nějak parsovat version2
