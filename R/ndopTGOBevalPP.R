@@ -37,8 +37,8 @@ source(paste0(path.wd, "shared.R"))
 path.rgee <- paste0(path.wd, "../../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec2023/RP-fw/rgee20230303/"
 source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.lsd <- paste0(path.prep, "lsd/")
-path.eval <- paste0(path.prep, "ndopTGOBeval/")
-path.tgob <- paste0(path.prep, "ndopTGOB/")
+path.eval <- paste0(path.prep, "ndopTGOBevalimp/")
+path.tgob <- paste0(path.prep, "ndopTGOBimp/")
 path.PP <- paste0(path.eval, "PP/")
 
 ############
@@ -481,7 +481,7 @@ tbl.f <- tbl %>%
   group_by(species, version) # final versions selection
 
 selection.f2 <- selection.rename
-combs.n <- 3
+combs.n <- 2
 if (anyAlt) {
   tbl.f %<>% mutate(version = ifelse(version == "TGOB", "TGOB", "anyAlt")) %>%
     mutate(clr = ifelse(clr == selection.colors[1], selection.colors[1], "#FF00FF")) %>%
