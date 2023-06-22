@@ -60,7 +60,7 @@ path.rgee <- paste0(path.wd, "../../../rgee/") # "D:/PERSONAL_DATA/pb/kostelec20
 source(paste0(path.rgee, "R/export_raster/functions.R"))
 path.ndop <- paste0(path.prep, "ndop/") # path.wd.prep.ndop
 path.lsd <- paste0(path.prep, "lsd/") # path.wd.prep.ndop
-path.tgob <- paste0(path.prep, "ndopTGOB/") # path.wd.prep.ndop
+path.tgob <- paste0(path.prep, "ndopTGOBimp/") # path.wd.prep.ndop
 path.tgob.tgbg <- paste0(path.prep, "ndopTGOBtgbg/") # path.wd.prep.ndop
 
 
