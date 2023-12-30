@@ -578,7 +578,7 @@ ggplot() +
     geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = st_as_sf(ndop.POLE.join.sp) %>% dplyr::select(DRUH.n), aes(fill = DRUH.n), lwd = 0.0) +
     scale_fill_viridis_c(option = "cividis", direction = -1, trans = "log10") +
-    labs(fill = "species count (log10)") +
+    labs(fill = "NDOP species count (log10)") +
     theme_light() +
     theme(
         axis.text = element_text(size = 2),
@@ -609,7 +609,7 @@ ggplot() +
     geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = st_as_sf(ndop.POLE.join.occs) %>% dplyr::select(ID_NALEZ.n), aes(fill = ID_NALEZ.n), lwd = 0.0) +
     scale_fill_viridis_c(option = "cividis", direction = -1, trans = "log10") +
-    labs(fill = "occurrences count (log10)") +
+    labs(fill = "NDOP occurrences count (log10)") +
     theme_light() +
     theme(
         axis.text = element_text(size = 2),
@@ -638,7 +638,7 @@ ggplot() +
     geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = st_as_sf(ndop.POLE.join.au) %>% dplyr::select(AUTOR.n), aes(fill = AUTOR.n), lwd = 0.0) +
     scale_fill_viridis_c(option = "cividis", direction = -1, trans = "log10") +
-    labs(fill = "observers count (log10)") +
+    labs(fill = "NDOP observers count (log10)") +
     theme_light() +
     theme(
         axis.text = element_text(size = 2),
@@ -651,6 +651,58 @@ ggplot() +
     geom_sf(data = SPH_OKRES.source.s.selected, fill = NA, color = "red", lwd = 0.2) +
     geom_sf(data = vzchu.source.s.selected, fill = NA, color = "#00b900", lwd = 0.2)
 ggsave(paste0(path.ndop, "map-observers-per-POLE.png"), width = 800, height = 600, units = "px")
+
+
+#
+# korelace mezi počty per pixel
+#
+
+c.occs <- as.numeric(unlist(ndop.POLE.join.occs %>% arrange(POLE) %>% dplyr::select(ID_NALEZ.n)))
+c.au <- as.numeric(unlist(ndop.POLE.join.au %>% arrange(POLE) %>% dplyr::select(AUTOR.n)))
+c.sp <- as.numeric(unlist(ndop.POLE.join.sp %>% arrange(POLE) %>% dplyr::select(DRUH.n)))
+
+cor.test(c.occs, c.au)
+cor.test(c.sp, c.au)
+cor.test(c.sp, c.occs)
+
+# > cor.test(c.occs, c.au)
+
+# 	Pearson's product-moment correlation
+
+# data:  c.occs and c.au
+# t = 64.962, df = 7853, p-value < 0.00000000000000022
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.5766455 0.6054201
+# sample estimates:
+#       cor 
+# 0.5912209 
+
+# > cor.test(c.sp, c.au)
+
+# 	Pearson's product-moment correlation
+
+# data:  c.sp and c.au
+# t = 61.538, df = 7853, p-value < 0.00000000000000022
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.5552753 0.5851203
+# sample estimates:
+#      cor 
+# 0.570386 
+
+# > cor.test(c.sp, c.occs)
+
+# 	Pearson's product-moment correlation
+
+# data:  c.sp and c.occs
+# t = 96.882, df = 7853, p-value < 0.00000000000000022
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.7276389 0.7477925
+# sample estimates:
+#       cor 
+# 0.7378801 
 
 
 #
