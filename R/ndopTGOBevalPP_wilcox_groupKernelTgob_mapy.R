@@ -185,8 +185,9 @@ for (sp in sps) {
 
 
     if (tbl.f.sp.ver$version.old == "TGOB") {
-      nw <- readRDS(paste0(path.tgob, "50ssos_collector.subset_", sp, "_1.rds"))[[ver.orig]][["kd"]][[tbl.f.sp.ver$adjust]]
+      # nw <- readRDS(paste0(path.tgob, "50ssos_collector.subset_", sp, "_1.rds"))[[ver.orig]][["kd"]][[tbl.f.sp.ver$adjust]]
       # readRDS("D:/PersonalWork/Balej/v2/RP/dataPrep/ndopTGOBimp999m/50ssos_collector.subset_Vanellus vanellus_4.rds")
+      nw <- readRDS(paste0(path.tgob.tgbg, "kdr90000999", "_", sp, ".rds"))[[tbl.f.sp.ver$adjust]]
 
       br.temp <- raster::resample(raster::raster(sumNormal(nw)), predictors[[1]], method = "bilinear") # sumNormal
 
