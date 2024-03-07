@@ -575,18 +575,21 @@ ndop.POLE.join.sp %<>% left_join(sitmap_2rad.czechia, by = "POLE") %>% ungroup()
 
 
 ggplot() +
-    geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = st_as_sf(ndop.POLE.join.sp) %>% dplyr::select(DRUH.n), aes(fill = DRUH.n), lwd = 0.0) +
-    scale_fill_viridis_c(option = "cividis", direction = -1, trans = "log10") +
-    labs(fill = "NDOP species count (log10)") +
+    # scale_fill_viridis_c(option = "cividis", direction = -1, trans = "log10") +
+    scale_fill_gradient2(low = "white", high = "black") +
+    labs(fill = "NDOP species count") +
     theme_light() +
     theme(
         axis.text = element_text(size = 2),
+        panel.grid.major = element_line(color = "gray", size = 0.05),
         legend.title = element_text(size = 5),
         legend.text = element_text(size = 3),
-        legend.key.size = unit(5, "pt"),
+        legend.key.size = unit(7, "pt"),
+        legend.key.height = unit(3, "pt"),
         legend.position = "bottom"
     ) +
+    geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = lsd.polygons, fill = NA, color = "cyan", lwd = 0.1) +
     geom_sf(data = SPH_OKRES.source.s.selected, fill = NA, color = "red", lwd = 0.2) +
     geom_sf(data = vzchu.source.s.selected, fill = NA, color = "#00b900", lwd = 0.2)
@@ -606,18 +609,20 @@ ndop.POLE.join.occs %<>% left_join(sitmap_2rad.czechia, by = "POLE") %>% ungroup
 
 
 ggplot() +
-    geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = st_as_sf(ndop.POLE.join.occs) %>% dplyr::select(ID_NALEZ.n), aes(fill = ID_NALEZ.n), lwd = 0.0) +
-    scale_fill_viridis_c(option = "cividis", direction = -1, trans = "log10") +
-    labs(fill = "NDOP occurrences count (log10)") +
+    scale_fill_gradient2(low = "white", high = "black") +
+    labs(fill = "NDOP occurrences count") +
     theme_light() +
     theme(
         axis.text = element_text(size = 2),
+        panel.grid.major = element_line(color = "gray", size = 0.05),
         legend.title = element_text(size = 5),
         legend.text = element_text(size = 3),
-        legend.key.size = unit(5, "pt"),
+        legend.key.size = unit(7, "pt"),
+        legend.key.height = unit(3, "pt"),
         legend.position = "bottom"
     ) +
+    geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = lsd.polygons, fill = NA, color = "cyan", lwd = 0.1) +
     geom_sf(data = SPH_OKRES.source.s.selected, fill = NA, color = "red", lwd = 0.2) +
     geom_sf(data = vzchu.source.s.selected, fill = NA, color = "#00b900", lwd = 0.2)
@@ -635,18 +640,20 @@ ndop.POLE.join.au %<>%
 ndop.POLE.join.au %<>% left_join(sitmap_2rad.czechia, by = "POLE") %>% ungroup()
 
 ggplot() +
-    geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = st_as_sf(ndop.POLE.join.au) %>% dplyr::select(AUTOR.n), aes(fill = AUTOR.n), lwd = 0.0) +
-    scale_fill_viridis_c(option = "cividis", direction = -1, trans = "log10") +
-    labs(fill = "NDOP observers count (log10)") +
+    scale_fill_gradient2(low = "white", high = "black") +
+    labs(fill = "NDOP observers count") +
     theme_light() +
     theme(
         axis.text = element_text(size = 2),
+        panel.grid.major = element_line(color = "gray", size = 0.05),
         legend.title = element_text(size = 5),
         legend.text = element_text(size = 3),
         legend.key.size = unit(5, "pt"),
+        legend.key.height = unit(3, "pt"),
         legend.position = "bottom"
     ) +
+    geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = lsd.polygons, fill = NA, color = "cyan", lwd = 0.1) +
     geom_sf(data = SPH_OKRES.source.s.selected, fill = NA, color = "red", lwd = 0.2) +
     geom_sf(data = vzchu.source.s.selected, fill = NA, color = "#00b900", lwd = 0.2)
@@ -675,8 +682,8 @@ cor.test(c.sp, c.occs)
 # 95 percent confidence interval:
 #  0.5766455 0.6054201
 # sample estimates:
-#       cor 
-# 0.5912209 
+#       cor
+# 0.5912209
 
 # > cor.test(c.sp, c.au)
 
@@ -688,8 +695,8 @@ cor.test(c.sp, c.occs)
 # 95 percent confidence interval:
 #  0.5552753 0.5851203
 # sample estimates:
-#      cor 
-# 0.570386 
+#      cor
+# 0.570386
 
 # > cor.test(c.sp, c.occs)
 
@@ -701,8 +708,8 @@ cor.test(c.sp, c.occs)
 # 95 percent confidence interval:
 #  0.7276389 0.7477925
 # sample estimates:
-#       cor 
-# 0.7378801 
+#       cor
+# 0.7378801
 
 
 #
