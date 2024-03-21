@@ -587,7 +587,8 @@ ggplot() +
         legend.text = element_text(size = 3),
         legend.key.size = unit(7, "pt"),
         legend.key.height = unit(3, "pt"),
-        legend.position = "bottom"
+        legend.position = "bottom",
+        plot.margin = unit(c(0, 0, 0, 0), "null")
     ) +
     geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = lsd.polygons, fill = NA, color = "cyan", lwd = 0.1) +
@@ -620,7 +621,8 @@ ggplot() +
         legend.text = element_text(size = 3),
         legend.key.size = unit(7, "pt"),
         legend.key.height = unit(3, "pt"),
-        legend.position = "bottom"
+        legend.position = "bottom",
+        plot.margin = unit(c(0, 0, 0, 0), "null")
     ) +
     geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = lsd.polygons, fill = NA, color = "cyan", lwd = 0.1) +
@@ -651,7 +653,8 @@ ggplot() +
         legend.text = element_text(size = 3),
         legend.key.size = unit(5, "pt"),
         legend.key.height = unit(3, "pt"),
-        legend.position = "bottom"
+        legend.position = "bottom",
+        plot.margin = unit(c(0, 0, 0, 0), "null")
     ) +
     geom_sf(data = SPH_STAT.source.s.selected, fill = NA, lwd = 0.2) +
     geom_sf(data = lsd.polygons, fill = NA, color = "cyan", lwd = 0.1) +
